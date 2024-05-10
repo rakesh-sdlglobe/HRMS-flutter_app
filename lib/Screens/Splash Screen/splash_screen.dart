@@ -2,11 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hrm_employee/Screens/Authentication/sign_in.dart';
 import 'package:nb_utils/nb_utils.dart';
 
 import '../../GlobalComponents/button_global.dart';
-import '../../GlobalComponents/purchase_model.dart';
-import '../../constant.dart';
 import 'on_board.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -16,25 +15,44 @@ class SplashScreen extends StatefulWidget {
   _SplashScreenState createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
   @override
   void initState() {
     super.initState();
+    _animationController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 5));
+    _animation = Tween<double>(begin: 0, end: 1).animate(_animationController);
+    _animationController.forward();
     init();
   }
 
-  Future<void> init() async {
-    await Future.delayed(const Duration(seconds: 2));
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
-    defaultBlurRadius = 10.0;
-    defaultSpreadRadius = 0.5;
-    // bool isValid = await PurchaseModel().isActiveBuyer();
-  bool  isValid = true;
-    if (isValid) {
-      finish(context);
-      const OnBoard().launch(context, isNewTask: true);
+   Future<void> init() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isFirstTime = prefs.getBool('first_time') ?? true;
+
+    await Future.delayed(const Duration(seconds: 7));
+
+    if (isFirstTime) {
+      await prefs.setBool('first_time', false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const OnBoard()),
+      );
     } else {
-      showLicense(context: context);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const SignIn()),
+      );
     }
   }
 
@@ -47,31 +65,45 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        backgroundColor: kMainColor,
-        body: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height / 3,
+        // backgroundColor: kMainColor,
+        //added container, decoration, gradient
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFDEE9), Color(0xFFB5FFFC)],
             ),
-            const Image(
-              image: AssetImage('images/round_logo.png'),
-            ),
-            const Spacer(),
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 10.0),
-                child: Text(
-                  'Version 1.0.0',
-                  style: GoogleFonts.manrope(
-                      color: Colors.white,
-                      fontWeight: FontWeight.normal,
-                      fontSize: 15.0),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: MediaQuery.of(context).size.height / 3,
+              ),
+              FadeTransition(
+                opacity: _animation,
+                child: Image.asset(
+                  'images/smart_h2r.png',
+                  width: 250,
                 ),
               ),
-            ),
-          ],
+              const Spacer(),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10.0),
+                  child: Text(
+                    'Version 1.0.0',
+                    style: GoogleFonts.manrope(
+                        color: Colors.white,
+                        fontWeight: FontWeight.normal,
+                        fontSize: 15.0),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
