@@ -1,5 +1,3 @@
-// ignore_for_file: depend_on_referenced_packages
-
 import 'package:flutter/material.dart';
 import 'package:nb_utils/nb_utils.dart';
 
@@ -10,41 +8,53 @@ class LeaveApply extends StatefulWidget {
   const LeaveApply({Key? key}) : super(key: key);
 
   @override
-  // ignore: library_private_types_in_public_api
   _LeaveApplyState createState() => _LeaveApplyState();
 }
 
 class _LeaveApplyState extends State<LeaveApply> {
-  final dateController = TextEditingController();
-  List<String> numberOfInstallment = ['Annual Leave', 'Casual Leave', 'Compensatory Leave', 'Exam Leave', 'Sick Leave'];
-  String installment = 'Annual Leave';
-  DropdownButton<String> getInstallment() {
-    List<DropdownMenuItem<String>> dropDownItems = [];
-    for (String installment in numberOfInstallment) {
-      var item = DropdownMenuItem(
-        value: installment,
-        child: Text(installment),
-      );
-      dropDownItems.add(item);
-    }
-    return DropdownButton(
-      items: dropDownItems,
-      value: installment,
-      onChanged: (value) {
-        setState(() {
-          installment = value!;
-        });
-      },
-    );
-  }
+  final fromDateController = TextEditingController();
+  final toDateController = TextEditingController();
+  final oneDateController = TextEditingController();
+  final descriptionController = TextEditingController();
+  List<String> numberOfInstallment = [
+    'Plan Leave',
+    'Casual Leave',
+  ];
+  String installment = 'Casual Leave';
+  bool isFullDay = true;
 
   @override
   void dispose() {
-    dateController.dispose();
+    fromDateController.dispose();
+    toDateController.dispose();
+    oneDateController.dispose();
     super.dispose();
   }
 
-  bool isFullDay = true;
+  void applyLeave() {
+    if (installment == 'Casual Leave') {
+      // Handle casual leave application
+      String leaveCategory = installment;
+      String leaveDuration =
+          isFullDay != null && isFullDay! ? 'Full Day' : 'Half Day';
+      String leaveDate = oneDateController.text;
+      String description = descriptionController.text;
+      print('Leave Category: $leaveCategory');
+      print('Leave Duration: $leaveDuration');
+      print('Leave Date: $leaveDate');
+      print('Description: $description');
+    } else if (installment == 'Plan Leave') {
+      // Handle planned leave application
+      String leaveCategory = installment;
+      String fromDate = fromDateController.text;
+      String toDate = toDateController.text;
+      String description = descriptionController.text;
+      print('Leave Category: $leaveCategory');
+      print('From Date: $fromDate');
+      print('To Date: $toDate');
+      print('Description: $description');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +69,10 @@ class _LeaveApplyState extends State<LeaveApply> {
         title: Text(
           'Leave Apply',
           maxLines: 2,
-          style: kTextStyle.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+          style: kTextStyle.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: const [
           Image(
@@ -78,7 +91,10 @@ class _LeaveApplyState extends State<LeaveApply> {
               width: context.width(),
               padding: const EdgeInsets.all(20.0),
               decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(30.0), topRight: Radius.circular(30.0)),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30.0),
+                  topRight: Radius.circular(30.0),
+                ),
                 color: Colors.white,
               ),
               child: Column(
@@ -93,11 +109,29 @@ class _LeaveApplyState extends State<LeaveApply> {
                       builder: (FormFieldState<dynamic> field) {
                         return InputDecorator(
                           decoration: InputDecoration(
-                              floatingLabelBehavior: FloatingLabelBehavior.always,
-                              labelText: 'Select Leave Type',
-                              labelStyle: kTextStyle,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(5.0))),
-                          child: DropdownButtonHideUnderline(child: getInstallment()),
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            labelText: 'Select Leave Type',
+                            labelStyle: kTextStyle,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(5.0),
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              items: numberOfInstallment.map((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value),
+                                );
+                              }).toList(),
+                              value: installment,
+                              onChanged: (value) {
+                                setState(() {
+                                  installment = value!;
+                                });
+                              },
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -105,49 +139,10 @@ class _LeaveApplyState extends State<LeaveApply> {
                   const SizedBox(
                     height: 20.0,
                   ),
-                  AppTextField(
-                    textFieldType: TextFieldType.NAME,
-                    readOnly: true,
-                    onTap: () async {
-                      var date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(1900), lastDate: DateTime(2100));
-                      dateController.text = date.toString().substring(0, 10);
-                    },
-                    controller: dateController,
-                    decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        floatingLabelBehavior: FloatingLabelBehavior.always,
-                        suffixIcon: Icon(
-                          Icons.date_range_rounded,
-                          color: kGreyTextColor,
-                        ),
-                        labelText: 'From Date',
-                        hintText: '11/09/2021'),
-                  ),
-                  const SizedBox(
-                    height: 20.0,
-                  ),
-                  AppTextField(
-                    textFieldType: TextFieldType.NAME,
-                    readOnly: true,
-                    onTap: () async {
-                      var date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(1900), lastDate: DateTime(2100));
-                      dateController.text = date.toString().substring(0, 10);
-                    },
-                    controller: dateController,
-                    decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        floatingLabelBehavior: FloatingLabelBehavior.always,
-                        suffixIcon: Icon(
-                          Icons.date_range_rounded,
-                          color: kGreyTextColor,
-                        ),
-                        labelText: 'To Date',
-                        hintText: '11/09/2021'),
-                  ),
-                  const SizedBox(
-                    height: 20.0,
-                  ),
-                  Row(
+                  if (installment == 'Casual Leave')
+                    Column(
+                      children: [
+                         Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Row(
@@ -196,11 +191,96 @@ class _LeaveApplyState extends State<LeaveApply> {
                       ),
                     ],
                   ),
-                  const SizedBox(
-                    height: 20.0,
-                  ),
+                        const SizedBox(height: 20.0),
+                        AppTextField(
+                          textFieldType: TextFieldType.NAME,
+                          readOnly: true,
+                          onTap: () async {
+                            var date = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime(2100),
+                            );
+                            oneDateController.text =
+                                date.toString().substring(0, 10);
+                          },
+                          controller: oneDateController,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            suffixIcon: Icon(
+                              Icons.date_range_rounded,
+                              color: kGreyTextColor,
+                            ),
+                            labelText: 'One Date',
+                            hintText: '11/09/2021',
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (installment == 'Plan Leave')
+                    Column(
+                      children: [
+                        AppTextField(
+                          textFieldType: TextFieldType.NAME,
+                          readOnly: true,
+                          onTap: () async {
+                            var date = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime(2100),
+                            );
+                            fromDateController.text =
+                                date.toString().substring(0, 10);
+                          },
+                          controller: fromDateController,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            suffixIcon: Icon(
+                              Icons.date_range_rounded,
+                              color: kGreyTextColor,
+                            ),
+                            labelText: 'From Date',
+                            hintText: '11/09/2021',
+                          ),
+                        ),
+                        const SizedBox(
+                          height: 20.0,
+                        ),
+                        AppTextField(
+                          textFieldType: TextFieldType.NAME,
+                          readOnly: true,
+                          onTap: () async {
+                            var date = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime(2100),
+                            );
+                            toDateController.text =
+                                date.toString().substring(0, 10);
+                          },
+                          controller: toDateController,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            suffixIcon: Icon(
+                              Icons.date_range_rounded,
+                              color: kGreyTextColor,
+                            ),
+                            labelText: 'To Date',
+                            hintText: '11/09/2021',
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 20.0),
                   AppTextField(
                     textFieldType: TextFieldType.NAME,
+                    controller: descriptionController,
                     maxLines: 5,
                     decoration: kInputDecoration.copyWith(
                       labelText: 'Description',
@@ -212,8 +292,9 @@ class _LeaveApplyState extends State<LeaveApply> {
                   ),
                   ButtonGlobal(
                     buttontext: 'Apply',
-                    buttonDecoration: kButtonDecoration.copyWith(color: kMainColor),
-                    onPressed: null,
+                    buttonDecoration:
+                        kButtonDecoration.copyWith(color: kMainColor),
+                    onPressed: applyLeave,
                   )
                 ],
               ),
