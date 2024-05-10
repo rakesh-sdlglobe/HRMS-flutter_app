@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:hrm_employee/constant.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+// ignore: depend_on_referenced_packages
 import 'package:nb_utils/nb_utils.dart';
 
 class AttendanceStorage extends StatefulWidget {
+  const AttendanceStorage({Key? key}) : super(key: key);
+
   @override
   State<AttendanceStorage> createState() => _AttendanceStorageState();
 }
@@ -61,6 +64,7 @@ class _AttendanceStorageState extends State<AttendanceStorage> {
     }
   }
 
+  // ignore: unused_element
   void _showPresentAbsentDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -333,6 +337,7 @@ class _AttendanceStorageState extends State<AttendanceStorage> {
                                     ],
                                   ),
                                 );
+                              // ignore: unnecessary_to_list_in_spreads
                               }).toList(),
                             ],
                           ),
