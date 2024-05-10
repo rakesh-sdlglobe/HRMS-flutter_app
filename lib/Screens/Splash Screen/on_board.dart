@@ -26,17 +26,20 @@ class _OnBoardState extends State<OnBoard> {
     {
       "icon": 'images/onboard1.png',
       "title": 'Keep healthy work-life balance',
-      "description": 'Lorem ipsum dolor sit amet, consectetuer adipisci elit, sed diam nonummy nibh euismod tincidunt u laoreet dolore magna aliquam erat volutpat. Ut wi',
+      "description":
+          'Maintain a healthy work-life balance: Set boundaries, prioritize tasks, take breaks, exercise, disconnect after hours, and plan enjoyable activities.',
     },
     {
       "icon": 'images/onboard2.png',
       "title": 'Track your work & get result',
-      "description": 'Lorem ipsum dolor sit amet, consectetuer adipisci elit, sed diam nonummy nibh euismod tincidunt u laoreet dolore magna aliquam erat volutpat. Ut wi',
+      "description":
+          'Maintain a record of your professional accomplishments: It helps with negotiations, performance reviews, and updating your resume. Celebrate your wins! ',
     },
     {
       "icon": 'images/onboard3.png',
       "title": 'Stay organized with team',
-      "description": 'Lorem ipsum dolor sit amet, consectetuer adipisci elit, sed diam nonummy nibh euismod tincidunt u laoreet dolore magna aliquam erat volutpat. Ut wi',
+      "description":
+          '"Stay Organized with Your Team" is your key to efficient collaboration. Get practical tips for clear communication and task delegation. Perfect for teams aiming for productivity and harmony',
     },
   ];
 
@@ -134,13 +137,19 @@ class _OnBoardState extends State<OnBoard> {
                           Expanded(
                             child: Container(
                               decoration: const BoxDecoration(
-                                borderRadius: BorderRadius.only(topLeft: Radius.circular(30.0), topRight: Radius.circular(30.0)),
+                                borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(30.0),
+                                    topRight: Radius.circular(30.0)),
                                 color: Colors.white,
                               ),
                               child: Column(
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.only(left: 20.0, right: 30.0, top: 15.0, bottom: 15.0),
+                                    padding: const EdgeInsets.only(
+                                        left: 20.0,
+                                        right: 30.0,
+                                        top: 15.0,
+                                        bottom: 15.0),
                                     child: Text(
                                       sliderList[index]['title'].toString(),
                                       textAlign: TextAlign.start,
@@ -151,12 +160,14 @@ class _OnBoardState extends State<OnBoard> {
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.only(left: 20.0, right: 20.0),
+                                    padding: const EdgeInsets.only(
+                                        left: 20.0, right: 20.0),
                                     // ignore: sized_box_for_whitespace
                                     child: Container(
                                       width: context.width(),
                                       child: Text(
-                                        sliderList[index]['description'].toString(),
+                                        sliderList[index]['description']
+                                            .toString(),
                                         textAlign: TextAlign.start,
                                         overflow: TextOverflow.ellipsis,
                                         maxLines: 5,
@@ -202,10 +213,15 @@ class _OnBoardState extends State<OnBoard> {
                             onTap: () {
                               setState(() {
                                 currentIndexPage < 2
-                                    ? pageController.nextPage(duration: const Duration(microseconds: 3000), curve: Curves.bounceInOut)
+                                    ? pageController.nextPage(
+                                        duration:
+                                            const Duration(microseconds: 3000),
+                                        curve: Curves.bounceInOut)
                                     : Navigator.push(
                                         context,
-                                        MaterialPageRoute(builder: (context) => const SelectType()),
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const SelectType()),
                                       );
                               });
                             },
