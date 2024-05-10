@@ -15,7 +15,6 @@ import 'package:hrm_employee/Screens/Work%20Report/daily_work_report.dart';
 import 'package:nb_utils/nb_utils.dart';
 import 'package:flutter_feather_icons/flutter_feather_icons.dart';
 import '../../GlobalComponents/button_global.dart';
-import '../../GlobalComponents/purchase_model.dart';
 import '../../constant.dart';
 import '../Attendance Management/management_screen.dart';
 
@@ -28,18 +27,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // logout(BuildContext context) async {
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //   // Clear any user data stored in SharedPreferences
-  //   prefs.clear();
-  //   // Navigate to the login screen and remove all previous routes
-  //   // ignore: use_build_context_synchronously
-  //   Navigator.pushAndRemoveUntil(
-  //     context,
-  //     MaterialPageRoute(builder: (context) => const SignIn()),
-  //     (Route<dynamic> route) => false,
-  //   );
-  // }
+  void logout(BuildContext context) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    // Clear any user data stored in SharedPreferences
+    prefs.clear();
+    // Navigate to the login screen and remove all previous routes
+    // ignore: use_build_context_synchronously
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const SignIn()),
+      (Route<dynamic> route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -327,7 +326,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 FeatherIcons.logOut,
                 color: kMainColor,
               ),
-              // onTap: logout(context),
+              onTap: () {
+                // Call the logout function when ListTile is tapped
+                logout(context);
+              },
             ),
           ],
         ),
@@ -359,10 +361,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           elevation: 2.0,
                           child: GestureDetector(
                             onTap: () async {
+                              // bool isValid = await PurchaseModel().isActiveBuyer(); // commented  out the purchagre model
                               bool isValid = true;
-                              // await PurchaseModel().isActiveBuyer();
                               if (isValid) {
                                 const EmployeeManagement().launch(context);
+                                // ignore: dead_code
                               } else {
                                 showLicense(context: context);
                               }
