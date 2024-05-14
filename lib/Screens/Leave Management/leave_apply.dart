@@ -9,7 +9,6 @@ import '../../GlobalComponents/button_global.dart';
 import '../../constant.dart';
 import 'package:intl/intl.dart';
 
-
 class LeaveApply extends StatefulWidget {
   const LeaveApply({Key? key}) : super(key: key);
 
@@ -18,7 +17,7 @@ class LeaveApply extends StatefulWidget {
 }
 
 class _LeaveApplyState extends State<LeaveApply> {
-  late UserData userData;
+  // late UserData userData;
   final fromDateController = TextEditingController();
   final toDateController = TextEditingController();
   final oneDateController = TextEditingController();
@@ -57,6 +56,10 @@ class _LeaveApplyState extends State<LeaveApply> {
     super.dispose();
   }
 
+  void resetNumberOfDays() {
+    daysController.text = '';
+  }
+
   void updateNumberOfDays() {
     String fromDate = fromDateController.text;
     String toDate = toDateController.text;
@@ -79,7 +82,7 @@ class _LeaveApplyState extends State<LeaveApply> {
   String reason = descriptionController.text;
   String days = daysController.text;
 
-  // Determine the half day value based on isFullDay
+//   // Determine the half day value based on isFullDay
   int halfDay = isFullDay ? 0 : 1;
 
   // Initialize start and end time strings
@@ -143,10 +146,9 @@ class _LeaveApplyState extends State<LeaveApply> {
   }
 }
 
-
-   @override
+  @override
   Widget build(BuildContext context) {
-    userData = Provider.of<UserData>(context, listen: false);
+   userData = Provider.of<UserData>(context, listen: false);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
@@ -217,6 +219,7 @@ class _LeaveApplyState extends State<LeaveApply> {
                               onChanged: (value) {
                                 setState(() {
                                   installment = value!;
+                                  resetNumberOfDays();
                                 });
                               },
                             ),
@@ -450,7 +453,7 @@ class _LeaveApplyState extends State<LeaveApply> {
                     buttontext: 'Apply',
                     buttonDecoration:
                         kButtonDecoration.copyWith(color: kMainColor),
-                    onPressed: applyLeave,
+                     onPressed: applyLeave,
                   )
                 ],
               ),
