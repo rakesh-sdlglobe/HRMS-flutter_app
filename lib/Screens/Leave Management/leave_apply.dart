@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../GlobalComponents/button_global.dart';
 import '../../constant.dart';
+import 'package:intl/intl.dart';
+
 
 class LeaveApply extends StatefulWidget {
   const LeaveApply({Key? key}) : super(key: key);
@@ -75,25 +77,51 @@ class _LeaveApplyState extends State<LeaveApply> {
   String fromdate = fromDateController.text;
   String todate = toDateController.text;
   String reason = descriptionController.text;
+  String days = daysController.text;
 
   // Determine the half day value based on isFullDay
   int halfDay = isFullDay ? 0 : 1;
 
+  // Initialize start and end time strings
+  String startTime = '';
+  String endTime = '';
+
+  // If it's a half-day leave, use selected start and end times
+  if (!isFullDay) {
+    startTime = selectedStartTime != null
+        ? selectedStartTime!.format(context)
+        : 'Unknown';
+    endTime = selectedEndTime != null
+        ? selectedEndTime!.format(context)
+        : 'Unknown';
+  }
+
   Map<String, dynamic> leaveValues = {
-    'companyID': '10',
+    'company_id': '10',
     'empcode': userData.userID,
-    'fromdate': fromdate,
-    'todate': todate,
+    'leaveid': 1,
+    'leavemode': 1,
     'reason': reason,
-    'leaveid':1,
-    'leavemode':1,
-    'leave_adjusted':0,
-    'half': halfDay // Assign halfDay value here
+    'fromdate': !isFullDay ? startTime : fromdate,
+    'todate':!isFullDay ? endTime: todate,
+    'half': halfDay,
+    'no_of_days': days,
+    'leave_adjusted': 0,
+    'approvel_status': 0,
+    'leave_status': 1,
+    'flag': 1,
+    'status': 1,
+    'createddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
+    'createdby': userData.userID,
+    'modifieddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
+    'modifiedby': userData.userID,
+    'start_time': startTime, // Include start time
+    'end_time': endTime,     // Include end time
   };
 
   String jsonData = jsonEncode(leaveValues);
 
-  String url = 'http://192.168.0.7:3000/leave/apply';
+  String url = 'http://192.168.1.101:3000/leave/apply';
 
   try {
     final response = await http.post(
@@ -118,6 +146,7 @@ class _LeaveApplyState extends State<LeaveApply> {
 
    @override
   Widget build(BuildContext context) {
+    userData = Provider.of<UserData>(context, listen: false);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
