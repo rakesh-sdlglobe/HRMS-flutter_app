@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hrm_employee/main.dart';
 import 'package:nb_utils/nb_utils.dart';
-
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import '../../GlobalComponents/button_global.dart';
 import '../../constant.dart';
 
@@ -12,6 +16,7 @@ class LeaveApply extends StatefulWidget {
 }
 
 class _LeaveApplyState extends State<LeaveApply> {
+  late UserData userData;
   final fromDateController = TextEditingController();
   final toDateController = TextEditingController();
   final oneDateController = TextEditingController();
@@ -31,33 +36,55 @@ class _LeaveApplyState extends State<LeaveApply> {
     super.dispose();
   }
 
-  void applyLeave() {
-    if (installment == 'Casual Leave') {
-      // Handle casual leave application
-      String leaveCategory = installment;
-      String leaveDuration =
-          isFullDay != null && isFullDay! ? 'Full Day' : 'Half Day';
-      String leaveDate = oneDateController.text;
-      String description = descriptionController.text;
-      print('Leave Category: $leaveCategory');
-      print('Leave Duration: $leaveDuration');
-      print('Leave Date: $leaveDate');
-      print('Description: $description');
-    } else if (installment == 'Plan Leave') {
-      // Handle planned leave application
-      String leaveCategory = installment;
-      String fromDate = fromDateController.text;
-      String toDate = toDateController.text;
-      String description = descriptionController.text;
-      print('Leave Category: $leaveCategory');
-      print('From Date: $fromDate');
-      print('To Date: $toDate');
-      print('Description: $description');
+  void applyLeave() async {
+  String fromdate = fromDateController.text;
+  String todate = toDateController.text;
+  String reason = descriptionController.text;
+
+  // Determine the half day value based on isFullDay
+  int halfDay = isFullDay ? 0 : 1;
+
+  Map<String, dynamic> leaveValues = {
+    'companyID': '10',
+    'empcode': userData.userID,
+    'fromdate': fromdate,
+    'todate': todate,
+    'reason': reason,
+    'leaveid':1,
+    'leavemode':1,
+    'leave_adjusted':0,
+    'half': halfDay // Assign halfDay value here
+  };
+
+  String jsonData = jsonEncode(leaveValues);
+
+  String url = 'http://192.168.0.7:3000/leave/apply';
+
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${userData.token}',
+      },
+      body: jsonData,
+    );
+
+    if (response.statusCode == 200) {
+      print('Leave posted successfully');
+    } else {
+      print('Failed to post leave: ${response.statusCode}');
     }
+  } catch (e) {
+    print('Exception while posting leave: $e');
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
+    userData = Provider.of<UserData>(context, listen: false);
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
