@@ -21,19 +21,54 @@ class _LeaveApplyState extends State<LeaveApply> {
   final toDateController = TextEditingController();
   final oneDateController = TextEditingController();
   final descriptionController = TextEditingController();
+  final daysController =
+      TextEditingController(); // New field for Number of days
+  final remainingLeavesController =
+      TextEditingController(text: '18'); // New field for Remaining Leaves
   List<String> numberOfInstallment = [
     'Plan Leave',
     'Casual Leave',
   ];
   String installment = 'Casual Leave';
   bool isFullDay = true;
+  bool isFirstHalf = true; // New variable to track first or second half
+  TimeOfDay? selectedStartTime;
+  TimeOfDay? selectedEndTime;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listeners to fromDateController and toDateController
+    fromDateController.addListener(updateNumberOfDays);
+    toDateController.addListener(updateNumberOfDays);
+  }
 
   @override
   void dispose() {
     fromDateController.dispose();
     toDateController.dispose();
     oneDateController.dispose();
+    daysController.dispose();
+    remainingLeavesController.dispose();
+    fromDateController.removeListener(updateNumberOfDays);
+    toDateController.removeListener(updateNumberOfDays);
     super.dispose();
+  }
+
+  void updateNumberOfDays() {
+    String fromDate = fromDateController.text;
+    String toDate = toDateController.text;
+
+    // Only update if both from date and to date are not empty
+    if (fromDate.isNotEmpty && toDate.isNotEmpty) {
+      // Calculate number of days between fromDate and toDate
+      DateTime startDate = DateTime.parse(fromDate);
+      DateTime endDate = DateTime.parse(toDate);
+      int numberOfDays = endDate.difference(startDate).inDays;
+
+      // Update the Number of days field with the calculated value
+      daysController.text = numberOfDays.toString();
+    }
   }
 
   void applyLeave() async {
@@ -81,10 +116,8 @@ class _LeaveApplyState extends State<LeaveApply> {
 }
 
 
-  @override
+   @override
   Widget build(BuildContext context) {
-    userData = Provider.of<UserData>(context, listen: false);
-
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
@@ -169,12 +202,10 @@ class _LeaveApplyState extends State<LeaveApply> {
                   if (installment == 'Casual Leave')
                     Column(
                       children: [
-                         Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Checkbox(
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30.0),
                               ),
@@ -184,19 +215,11 @@ class _LeaveApplyState extends State<LeaveApply> {
                                 setState(() {
                                   isFullDay = val!;
                                 });
-                              }),
-                          const SizedBox(
-                            width: 4.0,
-                          ),
-                          Text(
-                            'Full Day',
-                            style: kTextStyle,
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Checkbox(
+                              },
+                            ),
+                            const SizedBox(width: 4.0),
+                            Text('Full Day', style: kTextStyle),
+                            Checkbox(
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30.0),
                               ),
@@ -204,20 +227,79 @@ class _LeaveApplyState extends State<LeaveApply> {
                               value: !isFullDay,
                               onChanged: (val) {
                                 setState(() {
-                                  isFullDay = !isFullDay;
+                                  isFullDay = !val!;
                                 });
-                              }),
-                          const SizedBox(
-                            width: 4.0,
-                          ),
-                          Text(
-                            'Half Day',
-                            style: kTextStyle,
+                              },
+                            ),
+                            const SizedBox(width: 4.0),
+                            Text('Half Day', style: kTextStyle),
+                          ],
+                        ),
+                        if (!isFullDay) ...[
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final TimeOfDay? picked =
+                                      await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.now(),
+                                  );
+                                  if (picked != null &&
+                                      picked != selectedStartTime) {
+                                    setState(() {
+                                      selectedStartTime = picked;
+                                    });
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  backgroundColor: const Color.fromARGB(
+                                      255, 85, 125, 244), // Text color
+                                  elevation: 4, // Shadow depth
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        8), // Rounded corners
+                                  ),
+                                ),
+                                child: Text(selectedStartTime != null
+                                    ? selectedStartTime!.format(context)
+                                    : 'Select Start Time'),
+                              ),
+                              const SizedBox(width: 20),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  final TimeOfDay? picked =
+                                      await showTimePicker(
+                                    context: context,
+                                    initialTime: TimeOfDay.now(),
+                                  );
+                                  if (picked != null &&
+                                      picked != selectedEndTime) {
+                                    setState(() {
+                                      selectedEndTime = picked;
+                                    });
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  backgroundColor: const Color.fromARGB(
+                                      255, 85, 125, 244), // Text color
+                                  elevation: 4, // Shadow depth
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                        8), // Rounded corners
+                                  ),
+                                ),
+                                child: Text(selectedEndTime != null
+                                    ? selectedEndTime!.format(context)
+                                    : 'Select End Time'),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
-                  ),
                         const SizedBox(height: 20.0),
                         AppTextField(
                           textFieldType: TextFieldType.NAME,
@@ -305,12 +387,30 @@ class _LeaveApplyState extends State<LeaveApply> {
                       ],
                     ),
                   const SizedBox(height: 20.0),
+                  TextFormField(
+                    controller: daysController,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Number of days',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 20.0),
+                  TextFormField(
+                    controller: remainingLeavesController,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Remaining Leaves',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 20.0),
                   AppTextField(
                     textFieldType: TextFieldType.NAME,
                     controller: descriptionController,
                     maxLines: 5,
                     decoration: kInputDecoration.copyWith(
-                      labelText: 'Description',
+                      labelText: 'Leave Reason',
                       hintText: 'MaanTheme',
                     ),
                   ),
