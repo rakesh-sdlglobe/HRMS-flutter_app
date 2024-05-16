@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:hrm_employee/main.dart';
 import 'package:hrm_employee/Screens/Leave%20Management/edit_leave.dart';
 import 'package:hrm_employee/Screens/Leave%20Management/leave_apply.dart';
 import 'package:nb_utils/nb_utils.dart';
-import 'package:intl/intl.dart';
 import '../../constant.dart';
 
 class LeaveApplication extends StatefulWidget {
@@ -14,61 +17,66 @@ class LeaveApplication extends StatefulWidget {
 }
 
 class _LeaveApplicationState extends State<LeaveApplication> {
-  List<LeaveEntryData> leaveData = [
-    const LeaveEntryData(
-      leaveType: 'Plan Leave',
-      dateRange: '2021-05-16 to 2021-05-20',
-      applyDate: '2021-05-15',
-      status: 'Pending',
-    ),
-    const LeaveEntryData(
-      leaveType: 'Casual Leave',
-      dateRange: '2021-05-16 to 2021-05-16',
-      applyDate: '2021-05-15',
-      status: 'Approved',
-    ),
-    const LeaveEntryData(
-      leaveType: 'Casual Leave',
-      dateRange: '2021-05-16 to 2021-05-16',
-      applyDate: '2021-05-15',
-      status: 'Approved',
-    ),
-    const LeaveEntryData(
-      leaveType: 'Plan Leave',
-      dateRange: '2021-05-16 to 2021-05-20',
-      applyDate: '2021-05-15',
-      status: 'Pending',
-    ),
-    const LeaveEntryData(
-      leaveType: 'Casual Leave',
-      dateRange: '2021-05-16 to 2021-05-16',
-      applyDate: '2021-05-15',
-      status: 'Rejected',
-    ),
-    const LeaveEntryData(
-      leaveType: 'Plan Leave',
-      dateRange: '2021-05-16 to 2021-05-20',
-      applyDate: '2021-05-15',
-      status: 'Pending',
-    ),
-    const LeaveEntryData(
-      leaveType: 'Plan Leave',
-      dateRange: '2021-05-16 to 2021-05-20',
-      applyDate: '2021-05-15',
-      status: 'Approved',
-    ),
-  ];
+  late UserData userData;
+  List<LeaveData> leaveData = [];
 
-  void editLeave(BuildContext context, String leaveType, String dateRange,
+  @override
+  void initState() {
+    super.initState();
+    userData = Provider.of<UserData>(context, listen: false);
+    fetchLeaveData();
+  }
+
+  Future<void> fetchLeaveData() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.1.14:3000/leave/get'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${userData.token}',
+        },
+        body: json.encode({
+          'empcode': userData.userID,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        final List<dynamic> leaveRecords =
+            jsonData['leaveRecords']; // Access leaveRecords list
+        print(
+            'Frontend Response: $leaveRecords'); // Print response for debugging
+
+        setState(() {
+          leaveData = List<LeaveData>.from(leaveRecords.map((record) {
+            return LeaveData(
+              leaveType: record['leavemode'],
+              dateRange: '${record['fromdate']} to ${record['todate']}' ?? '',
+              applyDate: record['createddate'] ?? '',
+              status: record['approvel_status'],
+            );
+          }));
+        });
+      } else {
+        throw Exception('Failed to load leave records');
+      }
+    } catch (error) {
+      print('Error fetching leave records: $error');
+      // Handle error appropriately
+    }
+  }
+
+  void editLeave(BuildContext context, bool leaveType, String dateRange,
       String applyDate) {
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (context) => EditLeave(
-                leaveType: leaveType,
-                dateRange: dateRange,
-                applyDate: applyDate,
-              )),
+        builder: (context) => EditLeave(
+          leaveType: leaveType ? 'Casual Leave' : 'Planned Leave',
+          dateRange: dateRange,
+          applyDate: applyDate,
+        ),
+      ),
     );
   }
 
@@ -94,7 +102,9 @@ class _LeaveApplicationState extends State<LeaveApplication> {
           'Leave List',
           maxLines: 2,
           style: kTextStyle.copyWith(
-              color: Colors.white, fontWeight: FontWeight.bold),
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: const [
           Image(
@@ -114,8 +124,9 @@ class _LeaveApplicationState extends State<LeaveApplication> {
               padding: const EdgeInsets.all(20.0),
               decoration: const BoxDecoration(
                 borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30.0),
-                    topRight: Radius.circular(30.0)),
+                  topLeft: Radius.circular(30.0),
+                  topRight: Radius.circular(30.0),
+                ),
                 color: Colors.white,
               ),
               child: SingleChildScrollView(
@@ -125,25 +136,26 @@ class _LeaveApplicationState extends State<LeaveApplication> {
                     const SizedBox(
                       height: 20.0,
                     ),
-                    for (var i = 0; i < leaveData.length; i++)
+                    for (var leave in leaveData)
                       Column(
                         children: [
-                          LeaveEntryData(
-                            leaveType: leaveData[i].leaveType,
-                            dateRange: leaveData[i].dateRange,
-                            applyDate: leaveData[i].applyDate,
-                            status: leaveData[i].status,
+                          LeaveData(
+                            leaveType: leave.leaveType,
+                            dateRange: leave.dateRange,
+                            applyDate: leave.applyDate,
+                            status: leave.status,
                             onEdit: () {
                               editLeave(
                                 context,
-                                leaveData[i].leaveType,
-                                leaveData[i].dateRange,
-                                leaveData[i].applyDate,
+                                leave.leaveType,
+                                leave.dateRange,
+                                leave.applyDate,
                               );
                             },
                           ),
                           const SizedBox(
-                              height: 10.0), // Add space between entries
+                            height: 10.0,
+                          ), // Add space between entries
                         ],
                       ),
                   ],
@@ -157,14 +169,14 @@ class _LeaveApplicationState extends State<LeaveApplication> {
   }
 }
 
-class LeaveEntryData extends StatelessWidget {
-  final String leaveType;
+class LeaveData extends StatelessWidget {
+  final bool leaveType;
   final String dateRange;
   final String applyDate;
   final String status;
   final Function()? onEdit;
 
-  const LeaveEntryData({
+  const LeaveData({
     Key? key,
     required this.leaveType,
     required this.dateRange,
@@ -182,9 +194,14 @@ class LeaveEntryData extends StatelessWidget {
     final fromDate = DateTime.parse(dateRanges[0]);
     final toDate = DateTime.parse(dateRanges[1]);
 
-    final formattedDateRange = leaveType == 'Casual Leave'
+    final formattedDateRange = leaveType
         ? '${casualLeaveDateFormat.format(fromDate)}'
         : '${plannedLeaveDateFormat.format(fromDate)} to ${plannedLeaveDateFormat.format(toDate)}';
+
+    final applyDateFormat = DateFormat('dd, MMM yyyy');
+    final formattedApplyDate =
+        applyDateFormat.format(DateTime.parse(applyDate));
+
     Color borderColor = getStatusColor(status);
     return Material(
       elevation: 2.0,
@@ -198,7 +215,6 @@ class LeaveEntryData extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(
-                // color: Color(0xFF7D6AEF),
                 color: borderColor,
                 width: 3.0,
               ),
@@ -211,10 +227,12 @@ class LeaveEntryData extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    leaveType,
+                    leaveType ? 'Casual Leave' : 'Planned Leave',
                     maxLines: 2,
                     style: kTextStyle.copyWith(
-                        color: kTitleColor, fontWeight: FontWeight.bold),
+                      color: kTitleColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const Spacer(),
                   if (onEdit != null)
@@ -236,7 +254,7 @@ class LeaveEntryData extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '(Apply Date) $applyDate',
+                    '(Apply Date) $formattedApplyDate',
                     style: kTextStyle.copyWith(
                       color: kGreyTextColor,
                     ),
@@ -245,7 +263,7 @@ class LeaveEntryData extends StatelessWidget {
                   Text(
                     status,
                     style: kTextStyle.copyWith(
-                      color: getStatusColor(status),
+                      color: getStatusTextColor(status),
                     ),
                   ),
                   const SizedBox(
@@ -254,8 +272,8 @@ class LeaveEntryData extends StatelessWidget {
                   CircleAvatar(
                     radius: 10.0,
                     backgroundColor: getStatusColor(status),
-                    child: Icon(
-                      getIconForStatus(status),
+                    child: const Icon(
+                      Icons.check,
                       color: Colors.white,
                       size: 12,
                     ),
@@ -278,20 +296,20 @@ class LeaveEntryData extends StatelessWidget {
       case 'Rejected':
         return Colors.red;
       default:
-        return kGreyTextColor;
+        return Colors.grey;
     }
   }
 
-  IconData getIconForStatus(String status) {
+  Color getStatusTextColor(String status) {
     switch (status) {
       case 'Approved':
-        return Icons.check;
+        return kGreenColor;
       case 'Pending':
-        return Icons.pending;
+        return kAlertColor;
       case 'Rejected':
-        return Icons.close;
+        return Colors.red;
       default:
-        return Icons.info;
+        return Colors.grey;
     }
   }
 }
