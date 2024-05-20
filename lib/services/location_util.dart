@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:location/location.dart';
 
+
 class LocationUtil {
   static Future<Map<String, double?>?> getLocation(BuildContext context) async {
     Location location = Location();
