@@ -18,16 +18,31 @@ class DatabaseHelper {
 
     return await openDatabase(
       databasePath,
-      version: 1,
+      version: 2, 
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE $tableName(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT,
             time TEXT,
-            isCheckIn INTEGER
+            isCheckIn INTEGER,
+            longitude REAL,
+            latitude REAL 
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        // Perform database migration if upgrading from version 1 to 2
+        if (oldVersion < 2) {
+          await db.execute('''
+            ALTER TABLE $tableName 
+            ADD COLUMN longitude REAL
+          ''');
+          await db.execute('''
+            ALTER TABLE $tableName 
+            ADD COLUMN latitude REAL
+          ''');
+        }
       },
     );
   }
