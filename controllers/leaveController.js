@@ -94,3 +94,32 @@ exports.insertLeave = (req, res) => {
       res.status(200).json({ message: 'Leave record inserted successfully' });
     });
 };
+
+exports.fetchLeave = (req, res) => {
+  const { empcode } = req.body; 
+
+  const fetchSql = `
+    SELECT leaveid, fromdate, todate, createddate, approvel_status
+    FROM tbl_leave_apply_leave
+    WHERE empcode = @empcode
+  `;
+
+  pool.request()
+    .input('empcode', empcode)
+    .query(fetchSql, (fetchErr, fetchResult) => {
+      if (fetchErr) {
+        console.error('Error fetching leave records: ', fetchErr);
+        return res.status(500).json({ message: 'Error fetching leave records' });
+      }
+
+      const leaveRecords = fetchResult.recordset.map(record => ({
+        leaveType: record.leaveid,
+        fromdate: record.fromdate,
+        todate: record.todate,
+        createddate: record.createddate,
+        approvel_status: record.approvel_status ? 'Approved' : 'Pending'
+      }));
+
+      res.status(200).json({ leaveRecords });
+    });
+};
