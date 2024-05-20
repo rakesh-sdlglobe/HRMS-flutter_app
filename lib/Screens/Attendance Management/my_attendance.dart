@@ -1,15 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:hrm_employee/constant.dart';
+import 'package:hrm_employee/providers/user_provider.dart';
 import 'package:hrm_employee/services/database_helper.dart';
+import 'package:hrm_employee/services/location_util.dart';
 import 'package:intl/intl.dart';
 import 'package:nb_utils/nb_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 
-import '../../main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MyAttendance extends StatefulWidget {
   const MyAttendance({
@@ -20,22 +23,51 @@ class MyAttendance extends StatefulWidget {
   _MyAttendanceState createState() => _MyAttendanceState();
 }
 
+
 class _MyAttendanceState extends State<MyAttendance> {
   bool isOffice = true;
   late Timer _timer;
   late DateTime _currentTime;
   late String formattedDate;
   late String intime;
+  String locationName = '';
   late String dayOfWeek;
   bool isCheckedIn = false;
   late UserData userData;
+  String? checkedInTime;
+
   List<Map<String, String>> attendanceRecords = [];
 
   @override
   void initState() {
     super.initState();
+    intime = '';
     _updateTime();
     _startTimer();
+    _loadIntime(); // Load the check-in time from SharedPreferences
+    _checkTodayAttendance();
+  }
+
+  void _loadIntime() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      intime = prefs.getString('intime') ?? '';
+    });
+  }
+
+  void _saveIntime(String intime) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setString('intime', intime);
+  }
+
+  void _checkTodayAttendance() async {
+    List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
+
+    if (todayAttendance.isNotEmpty) {
+      setState(() {
+        isCheckedIn = todayAttendance.last['isCheckIn'] == 1;
+      });
+    }
   }
 
   void _startTimer() {
@@ -60,112 +92,158 @@ class _MyAttendanceState extends State<MyAttendance> {
   }
 
   DatabaseHelper _databaseHelper = DatabaseHelper();
-  void checkIn() async {
-    // Check if the user has already checked in for today
-    intime =
-        '${_currentTime.year}-${_currentTime.month}-${_currentTime.day} ${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}';
 
-    List<Map<String, dynamic>> todayAttendance =
-        await _databaseHelper.getAttendanceByDate(formattedDate);
+Future<void> getLocationName(double latitude, double longitude) async {
+  final url = 'https://nominatim.openstreetmap.org/reverse?lat=$latitude&lon=$longitude&format=json';
 
-    // If the user has already checked in, show a message and return
-    if (todayAttendance.isNotEmpty && todayAttendance.first['isCheckIn'] == 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You have already checked in for today.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
+  try {
+    final response = await Dio().get(url);
+    if (response.statusCode == 200) {
+      final data = response.data;
+      setState(() {
+        locationName = data['display_name']; 
+      });
+    } else {
+      throw Exception('Failed to fetch location data from OpenStreetMap Nominatim API');
     }
+  } catch (e) {
+    throw Exception('Error: $e');
+  }
+}
 
-    // If the user hasn't checked in yet, record the check-in time
-    Map<String, dynamic> attendanceData = {
-      'date': formattedDate,
-      'time':
-          '${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}',
-      'isCheckIn': 1,
-    };
-
-    await _databaseHelper.insertAttendance(attendanceData);
-
-    setState(() {
-      isCheckedIn = true;
-    });
+void checkIn() async {
+  if (intime.isEmpty) {
+    intime = '${_currentTime.year}-${_currentTime.month}-${_currentTime.day} ${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}';
+    _saveIntime(intime); // Save the check-in time to SharedPreferences
   }
 
-  void checkOut() async {
-    // Record the current time as the check-out time
-    String outime =
-        '${_currentTime.year}-${_currentTime.month}-${_currentTime.day} ${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}';
+  List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
 
-    // Check if the user has already checked out for today
-    List<Map<String, dynamic>> todayAttendance =
-        await _databaseHelper.getAttendanceByDate(formattedDate);
+  Map<String, double?>? location = await LocationUtil.getLocation(context);
 
-    // If the user has already checked out, show a message and return
-    if (todayAttendance.isNotEmpty && todayAttendance.first['isCheckIn'] == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You have already checked out for today.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    // Record the check-out time locally
-    Map<String, dynamic> attendanceData = {
-      'date': formattedDate,
-      'time': outime,
-      'isCheckIn': 0,
-    };
-
-    await _databaseHelper.insertAttendance(attendanceData);
-
-    setState(() {
-      isCheckedIn = false;
-    });
-
-    // Call attendanceValues with outime
-    attendanceValues( outime: outime);
+  if (location == null || location['latitude'] == null || location['longitude'] == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Failed to retrieve location. Please try again.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    return;
   }
 
-  void attendanceValues(
-      {required String outime}) async {
+  double latitude = location['latitude']!;
+  double longitude = location['longitude']!;
 
-    Map<String, dynamic> attendanceValues = {
-      'companyID': '10',
-      'empcode': userData.userID,
-      'exactdate': formattedDate,
-      'intime': intime,
-      'outtime': outime,
-    };
-
-    String jsonData = jsonEncode(attendanceValues);
-
-    String url = 'http://192.168.0.7:3000/attendance/time';
-    // String? authToken = userData.token;
-
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${userData.token}',
-        },
-        body: jsonData,
-      );
-
-      if (response.statusCode == 200) {
-        print('Out time posted successfully');
-      } else {
-        print('Failed to post out time: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Exception while posting out time: $e');
-    }
+  if (todayAttendance.isNotEmpty && todayAttendance.first['isCheckIn'] == 1) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You have already checked in for today.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    return;
   }
+
+  await getLocationName(latitude, longitude);
+
+  Map<String, dynamic> attendanceData = {
+    'date': formattedDate,
+    'time': intime,
+    'isCheckIn': 1,
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  await _databaseHelper.insertAttendance(attendanceData);
+
+  setState(() {
+    isCheckedIn = true;
+  });
+}
+
+void checkOut() async {
+  String outime = '${_currentTime.year}-${_currentTime.month}-${_currentTime.day} ${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}';
+
+  List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
+
+  Map<String, double?>? location = await LocationUtil.getLocation(context);
+
+  if (location == null || location['latitude'] == null || location['longitude'] == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Failed to retrieve location. Please try again.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    return;
+  }
+
+  double latitude = location['latitude']!;
+  double longitude = location['longitude']!;
+
+  if (todayAttendance.isNotEmpty && todayAttendance.first['isCheckIn'] == 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You have already checked out for today.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    return;
+  }
+
+  await getLocationName(latitude, longitude);
+
+  Map<String, dynamic> attendanceData = {
+    'date': formattedDate,
+    'time': outime,
+    'isCheckIn': 0,
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  await _databaseHelper.insertAttendance(attendanceData);
+
+  setState(() {
+    isCheckedIn = false;
+  });
+
+  attendanceValues(outime: outime);
+}
+
+void attendanceValues({required String outime}) async {
+  Map<String, dynamic> attendanceValues = {
+    'companyID': '10',
+    'empcode': userData.userID,
+    'exactdate': formattedDate,
+    'intime': intime,
+    'outtime': outime,
+    'location': locationName,
+  };
+
+  String jsonData = jsonEncode(attendanceValues);
+
+  String url = 'http://192.168.1.116:3000/attendance/time';
+
+  try {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${userData.token}',
+      },
+      body: jsonData,
+    );
+
+    if (response.statusCode == 200) {
+      print('Out time posted successfully');
+    } else {
+      print('Failed to post out time: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Exception while posting out time: $e');
+  }
+}
+
 
   void showCheckInSnackBar() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -177,11 +255,8 @@ class _MyAttendanceState extends State<MyAttendance> {
   }
 
   void viewAttendance() async {
-    // Fetch today's attendance records from the database
-    List<Map<String, dynamic>> todayAttendance =
-        await _databaseHelper.getAttendanceByDate(formattedDate);
+    List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
 
-    // Create a dialog box to display today's attendance
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -291,8 +366,7 @@ class _MyAttendanceState extends State<MyAttendance> {
                       children: [
                         Text(
                           'Your Location:',
-                          style:
-                              kTextStyle.copyWith(fontWeight: FontWeight.bold),
+                          style: kTextStyle.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(width: 4.0),
                         Text(
@@ -328,8 +402,7 @@ class _MyAttendanceState extends State<MyAttendance> {
                         children: [
                           Text(
                             'Choose your Attendance mode',
-                            style: kTextStyle.copyWith(
-                                fontWeight: FontWeight.bold),
+                            style: kTextStyle.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 10.0),
                           Container(
@@ -353,18 +426,14 @@ class _MyAttendanceState extends State<MyAttendance> {
                                         backgroundColor: kMainColor,
                                         child: Icon(
                                           Icons.check,
-                                          color: isOffice
-                                              ? Colors.white
-                                              : kMainColor,
+                                          color: isOffice ? Colors.white : kMainColor,
                                         ),
                                       ),
                                       const SizedBox(width: 4.0),
                                       Text(
                                         'Office',
                                         style: kTextStyle.copyWith(
-                                          color: isOffice
-                                              ? kTitleColor
-                                              : Colors.white,
+                                          color: isOffice ? kTitleColor : Colors.white,
                                         ),
                                       ),
                                       const SizedBox(width: 12.0),
@@ -379,8 +448,7 @@ class _MyAttendanceState extends State<MyAttendance> {
                                   padding: const EdgeInsets.all(4.0),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(30.0),
-                                    color:
-                                        !isOffice ? Colors.white : kMainColor,
+                                    color: !isOffice ? Colors.white : kMainColor,
                                   ),
                                   child: Row(
                                     children: [
@@ -388,18 +456,14 @@ class _MyAttendanceState extends State<MyAttendance> {
                                         backgroundColor: kMainColor,
                                         child: Icon(
                                           Icons.check,
-                                          color: !isOffice
-                                              ? Colors.white
-                                              : kMainColor,
+                                          color: !isOffice ? Colors.white : kMainColor,
                                         ),
                                       ),
                                       const SizedBox(width: 4.0),
                                       Text(
                                         'Outside',
                                         style: kTextStyle.copyWith(
-                                          color: !isOffice
-                                              ? kTitleColor
-                                              : Colors.white,
+                                          color: !isOffice ? kTitleColor : Colors.white,
                                         ),
                                       ),
                                       const SizedBox(width: 12.0),
@@ -415,11 +479,8 @@ class _MyAttendanceState extends State<MyAttendance> {
                           ),
                           const SizedBox(height: 30.0),
                           Text(
-                            _currentTime.hour < 12
-                                ? "Good Morning"
-                                : _currentTime.hour < 16
-                                    ? "Good Afternoon"
-                                    : "Good Evening",
+                            _currentTime.hour < 12 ? "Good Morning"
+                                : _currentTime.hour < 16 ? "Good Afternoon" : "Good Evening",
                             style: kTextStyle.copyWith(
                               fontWeight: FontWeight.bold,
                               fontSize: 18.0,
@@ -432,9 +493,7 @@ class _MyAttendanceState extends State<MyAttendance> {
                           ),
                           const SizedBox(height: 10.0),
                           Text(
-                            _currentTime != null
-                                ? '${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}'
-                                : 'Loading...',
+                            '${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}',
                             style: kTextStyle.copyWith(
                               fontWeight: FontWeight.bold,
                               fontSize: 25.0,
@@ -445,24 +504,19 @@ class _MyAttendanceState extends State<MyAttendance> {
                             padding: const EdgeInsets.all(20.0),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(100.0),
-                              color: isOffice
-                                  ? kGreenColor.withOpacity(0.1)
-                                  : kAlertColor.withOpacity(0.1),
+                              color: isOffice ? kGreenColor.withOpacity(0.1) : kAlertColor.withOpacity(0.1),
                             ),
                             child: GestureDetector(
                               onTap: () {
                                 if (isOffice) {
                                   isCheckedIn ? checkOut() : checkIn();
                                 } else {
-                                  isCheckedIn
-                                      ? checkOut()
-                                      : showCheckInSnackBar();
+                                  isCheckedIn ? checkOut() : showCheckInSnackBar();
                                 }
                               },
                               child: CircleAvatar(
                                 radius: 80.0,
-                                backgroundColor:
-                                    isOffice ? kGreenColor : kAlertColor,
+                                backgroundColor: isOffice ? kGreenColor : kAlertColor,
                                 child: Text(
                                   isOffice ? 'Check In' : 'Check Out',
                                   style: kTextStyle.copyWith(
