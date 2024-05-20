@@ -1,31 +1,29 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:hrm_employee/main.dart';
 import 'package:nb_utils/nb_utils.dart';
-import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
 import '../../GlobalComponents/button_global.dart';
 import '../../constant.dart';
-import 'package:intl/intl.dart';
 
-class EditLeave extends StatefulWidget {
+class EditLeavePage extends StatefulWidget {
   final String leaveType;
-  final String dateRange;
+  final String halfDayDateRange;
+  final String fullDayDateRange;
   final String applyDate;
 
-  const EditLeave({
+  const EditLeavePage({
     Key? key,
     required this.leaveType,
-    required this.dateRange,
+    required this.halfDayDateRange,
+    required this.fullDayDateRange,
     required this.applyDate,
   }) : super(key: key);
 
   @override
-  EditLeaveState createState() => EditLeaveState();
+  _EditLeavePageState createState() => _EditLeavePageState();
 }
 
-class _EditLeaveState extends State<EditLeave> {
+class _EditLeavePageState extends State<EditLeavePage> {
   final fromDateController = TextEditingController();
   final toDateController = TextEditingController();
   final oneDateController = TextEditingController();
@@ -47,16 +45,27 @@ class _EditLeaveState extends State<EditLeave> {
   @override
   void initState() {
     super.initState();
-    // Add listeners to fromDateController and toDateController
     fromDateController.addListener(updateNumberOfDays);
     toDateController.addListener(updateNumberOfDays);
-    fromDateController.text = widget.dateRange.split(' to ')[0];
-    toDateController.text = widget.dateRange.split(' to ')[1];
-    oneDateController.text = widget.dateRange.split(' to ')[0];
+    fromDateController.text = widget.fullDayDateRange.isNotEmpty
+        ? widget.fullDayDateRange.split(' to ')[0]
+        : widget.halfDayDateRange.split(' to ')[0];
+    toDateController.text = widget.fullDayDateRange.isNotEmpty
+        ? widget.fullDayDateRange.split(' to ')[1]
+        : widget.halfDayDateRange.split(' to ')[1];
 
-    // Set the leave type based on the data coming from another page
-    if (widget.leaveType == 'Casual Leave') {
+    if (widget.leaveType == 'Casual') {
       installment = 'Casual Leave';
+      if (widget.halfDayDateRange.isNotEmpty) {
+        isFullDay = false; // Set isFullDay to false if it's a half day
+        // Extract start time and end time
+        selectedStartTime =
+            TimeOfDay.fromDateTime(DateTime.parse(fromDateController.text));
+        selectedEndTime =
+            TimeOfDay.fromDateTime(DateTime.parse(toDateController.text));
+      } else {
+        isFullDay = true; // Set isFullDay to true if it's a full day
+      }
     } else {
       installment = 'Plan Leave';
     }
@@ -410,4 +419,3 @@ class _EditLeaveState extends State<EditLeave> {
     );
   }
 }
-
