@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hrm_employee/main.dart';
+import 'package:hrm_employee/providers/user_provider.dart';
 import 'package:nb_utils/nb_utils.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -17,7 +18,7 @@ class LeaveApply extends StatefulWidget {
 }
 
 class _LeaveApplyState extends State<LeaveApply> {
-  // late UserData userData;
+  late UserData userData;
   final fromDateController = TextEditingController();
   final toDateController = TextEditingController();
   final oneDateController = TextEditingController();
@@ -56,10 +57,6 @@ class _LeaveApplyState extends State<LeaveApply> {
     super.dispose();
   }
 
-  void resetNumberOfDays() {
-    daysController.text = '';
-  }
-
   void updateNumberOfDays() {
     String fromDate = fromDateController.text;
     String toDate = toDateController.text;
@@ -77,78 +74,95 @@ class _LeaveApplyState extends State<LeaveApply> {
   }
 
   void applyLeave() async {
-  String fromdate = fromDateController.text;
-  String todate = toDateController.text;
-  String reason = descriptionController.text;
-  String days = daysController.text;
+    String onDate = oneDateController.text;
+    String reason = descriptionController.text;
+    String days = daysController.text;
 
-//   // Determine the half day value based on isFullDay
-  int halfDay = isFullDay ? 0 : 1;
+    // Determine the half-day value based on isFullDay
+    int halfDay = isFullDay ? 0 : 1;
 
-  // Initialize start and end time strings
-  String startTime = '';
-  String endTime = '';
+    // Initialize start and end time strings
+    String startTime = '';
+    String endTime = '';
 
-  // If it's a half-day leave, use selected start and end times
-  if (!isFullDay) {
-    startTime = selectedStartTime != null
-        ? selectedStartTime!.format(context)
-        : 'Unknown';
-    endTime = selectedEndTime != null
-        ? selectedEndTime!.format(context)
-        : 'Unknown';
-  }
-
-  Map<String, dynamic> leaveValues = {
-    'company_id': '10',
-    'empcode': userData.userID,
-    'leaveid': 1,
-    'leavemode': 1,
-    'reason': reason,
-    'fromdate': !isFullDay ? startTime : fromdate,
-    'todate':!isFullDay ? endTime: todate,
-    'half': halfDay,
-    'no_of_days': days,
-    'leave_adjusted': 0,
-    'approvel_status': 0,
-    'leave_status': 1,
-    'flag': 1,
-    'status': 1,
-    'createddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
-    'createdby': userData.userID,
-    'modifieddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
-    'modifiedby': userData.userID,
-    'start_time': startTime, // Include start time
-    'end_time': endTime,     // Include end time
-  };
-
-  String jsonData = jsonEncode(leaveValues);
-
-  String url = 'http://192.168.1.101:3000/leave/apply';
-
-  try {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${userData.token}',
-      },
-      body: jsonData,
-    );
-
-    if (response.statusCode == 200) {
-      print('Leave posted successfully');
-    } else {
-      print('Failed to post leave: ${response.statusCode}');
+    // If it's a half-day leave, use selected start and end times
+    if (!isFullDay) {
+      startTime = selectedStartTime != null
+          ? selectedStartTime!.format(context)
+          : 'Unknown';
+      endTime = selectedEndTime != null
+          ? selectedEndTime!.format(context)
+          : 'Unknown';
     }
-  } catch (e) {
-    print('Exception while posting leave: $e');
+
+    int numberOfDays = days.isNotEmpty ? int.parse(days) : 0;
+
+    int leaveId = installment == 'Casual Leave' ? 1 : 3;
+
+    // Determine the correct from date and to date based on isFullDay and leave type
+    String fromdate = isFullDay ? fromDateController.text : onDate;
+    String toDate = isFullDay ? toDateController.text : onDate;
+
+    if (installment == 'Casual Leave') {
+      // For casual leave, set fromdate and toDate to the same date
+      fromDateController.text = onDate;
+      toDateController.text = onDate;
+      fromdate = onDate;
+      toDate = onDate;
+    }
+
+    // Append time to fromdate and toDate
+    fromdate += ' $startTime';
+    toDate += ' $endTime';
+
+    Map<String, dynamic> leaveValues = {
+      'company_id': '10',
+      'empcode': userData.userID,
+      'leaveid': leaveId,
+      'leavemode': 1,
+      'reason': reason,
+      'fromdate': fromdate,
+      'todate': toDate,
+      'half': halfDay,
+      'no_of_days': numberOfDays,
+      'leave_adjusted': 0,
+      'approvel_status': 0,
+      'leave_status': 1,
+      'flag': 1,
+      'status': 1,
+      'createddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
+      'createdby': userData.userID,
+      'modifieddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
+      'modifiedby': userData.userID,
+    };
+
+    String jsonData = jsonEncode(leaveValues);
+
+    String url = 'http://192.168.1.14:3000/leave/apply';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${userData.token}',
+        },
+        body: jsonData,
+      );
+
+      if (response.statusCode == 200) {
+        print('Leave posted successfully');
+      } else {
+        print('Failed to post leave: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Exception while posting leave: $e');
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
-   userData = Provider.of<UserData>(context, listen: false);
+    userData = Provider.of<UserData>(context, listen: false);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
@@ -219,7 +233,6 @@ class _LeaveApplyState extends State<LeaveApply> {
                               onChanged: (value) {
                                 setState(() {
                                   installment = value!;
-                                  resetNumberOfDays();
                                 });
                               },
                             ),
@@ -416,17 +429,17 @@ class _LeaveApplyState extends State<LeaveApply> {
                             hintText: '11/09/2021',
                           ),
                         ),
+                        const SizedBox(height: 20.0),
+                        TextFormField(
+                          controller: daysController,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Number of days',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
                       ],
                     ),
-                  const SizedBox(height: 20.0),
-                  TextFormField(
-                    controller: daysController,
-                    readOnly: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Number of days',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
                   const SizedBox(height: 20.0),
                   TextFormField(
                     controller: remainingLeavesController,
@@ -453,7 +466,7 @@ class _LeaveApplyState extends State<LeaveApply> {
                     buttontext: 'Apply',
                     buttonDecoration:
                         kButtonDecoration.copyWith(color: kMainColor),
-                     onPressed: applyLeave,
+                    onPressed: applyLeave,
                   )
                 ],
               ),
