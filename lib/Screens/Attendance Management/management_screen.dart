@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:hrm_employee/Screens/Attendance%20Management/attendance_storrage.dart';
 import 'package:hrm_employee/Screens/Attendance%20Management/my_attendance.dart';
 import 'package:hrm_employee/Screens/Work%20Report/daily_work_report.dart';
+import 'package:hrm_employee/services/location_util.dart';
 import 'package:nb_utils/nb_utils.dart';
 
 import '../../constant.dart';
-import '../Attendance New Report/attendence_new_report.dart';
+import 'package:location/location.dart';
 
 class EmployeeManagement extends StatefulWidget {
   const EmployeeManagement({Key? key}) : super(key: key);
@@ -70,7 +71,7 @@ class _EmployeeManagementState extends State<EmployeeManagement> {
                       ),
                       child: ListTile(
                         onTap: () {
-                          MyAttendance().launch(context);
+                          const MyAttendance().launch(context);
                         },
                         leading: const Image(
                             image: AssetImage('images/timeattendance.png')),
@@ -133,4 +134,6 @@ class _EmployeeManagementState extends State<EmployeeManagement> {
       ),
     );
   }
+
+
 }
