@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:hrm_employee/constant.dart';
 import 'package:hrm_employee/providers/user_provider.dart';
-import 'package:hrm_employee/services/database_helper.dart';
 import 'package:hrm_employee/services/location_util.dart';
 import 'package:intl/intl.dart';
 import 'package:nb_utils/nb_utils.dart';
@@ -23,7 +22,6 @@ class MyAttendance extends StatefulWidget {
   _MyAttendanceState createState() => _MyAttendanceState();
 }
 
-
 class _MyAttendanceState extends State<MyAttendance> {
   bool isOffice = true;
   late Timer _timer;
@@ -37,6 +35,7 @@ class _MyAttendanceState extends State<MyAttendance> {
   String? checkedInTime;
 
   List<Map<String, String>> attendanceRecords = [];
+  
 
   @override
   void initState() {
@@ -45,29 +44,33 @@ class _MyAttendanceState extends State<MyAttendance> {
     _updateTime();
     _startTimer();
     _loadIntime(); // Load the check-in time from SharedPreferences
-    _checkTodayAttendance();
   }
 
   void _loadIntime() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       intime = prefs.getString('intime') ?? '';
+      isCheckedIn = intime.isNotEmpty;
     });
   }
 
-  void _saveIntime(String intime) async {
+ void _saveIntime() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setString('intime', intime);
+    String currentTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+    prefs.setString('intime', currentTime);
+    setState(() {
+      intime = currentTime;
+      isCheckedIn = true;
+    });
   }
 
-  void _checkTodayAttendance() async {
-    List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
-
-    if (todayAttendance.isNotEmpty) {
-      setState(() {
-        isCheckedIn = todayAttendance.last['isCheckIn'] == 1;
-      });
-    }
+   void _clearIntime() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.remove('intime');
+    setState(() {
+      intime = '';
+      isCheckedIn = false;
+    });
   }
 
   void _startTimer() {
@@ -91,50 +94,65 @@ class _MyAttendanceState extends State<MyAttendance> {
     super.dispose();
   }
 
-  DatabaseHelper _databaseHelper = DatabaseHelper();
+  Future<void> getLocationName(double latitude, double longitude) async {
+    final url = 'https://nominatim.openstreetmap.org/reverse?lat=$latitude&lon=$longitude&format=json';
 
-Future<void> getLocationName(double latitude, double longitude) async {
-  final url = 'https://nominatim.openstreetmap.org/reverse?lat=$latitude&lon=$longitude&format=json';
-
-  try {
-    final response = await Dio().get(url);
-    if (response.statusCode == 200) {
-      final data = response.data;
-      setState(() {
-        locationName = data['display_name']; 
-      });
-    } else {
-      throw Exception('Failed to fetch location data from OpenStreetMap Nominatim API');
+    try {
+      final response = await Dio().get(url);
+      if (response.statusCode == 200) {
+        final data = response.data;
+        setState(() {
+          locationName = data['display_name'];
+        });
+      } else {
+        throw Exception('Failed to fetch location data from OpenStreetMap Nominatim API');
+      }
+    } catch (e) {
+      throw Exception('Error: $e');
     }
-  } catch (e) {
-    throw Exception('Error: $e');
   }
-}
+
+  Future<List<Map<String, dynamic>>> fetchAttendanceData() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.1.7:3000/attendance/get'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${userData.token}',
+        },
+        body: json.encode({
+          'empcode': userData.userID,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        final List<dynamic> attendanceRecords = jsonData['attendanceRecords'];
+        return List<Map<String, dynamic>>.from(attendanceRecords);
+      } else {
+        throw Exception('Failed to load attendance records');
+      }
+    } catch (error) {
+      print('Error fetching attendance records: $error');
+      return [];
+    }
+  }
 
 void checkIn() async {
   if (intime.isEmpty) {
-    intime = '${_currentTime.year}-${_currentTime.month}-${_currentTime.day} ${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}';
-    _saveIntime(intime); // Save the check-in time to SharedPreferences
+    _saveIntime();
   }
 
-  List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
+  List<Map<String, dynamic>> todayAttendance = await fetchAttendanceData();
 
-  Map<String, double?>? location = await LocationUtil.getLocation(context);
+ String formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+   bool hasCheckedInToday = todayAttendance.any((record) {
+    DateTime recordDate = DateTime.parse(record['exactdate']);
+    String recordFormattedDate = DateFormat('yyyy-MM-dd').format(recordDate);
+    return recordFormattedDate == formattedDate;
+  });
 
-  if (location == null || location['latitude'] == null || location['longitude'] == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Failed to retrieve location. Please try again.'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-    return;
-  }
-
-  double latitude = location['latitude']!;
-  double longitude = location['longitude']!;
-
-  if (todayAttendance.isNotEmpty && todayAttendance.first['isCheckIn'] == 1) {
+  if (hasCheckedInToday) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('You have already checked in for today.'),
@@ -144,28 +162,6 @@ void checkIn() async {
     return;
   }
 
-  await getLocationName(latitude, longitude);
-
-  Map<String, dynamic> attendanceData = {
-    'date': formattedDate,
-    'time': intime,
-    'isCheckIn': 1,
-    'latitude': latitude,
-    'longitude': longitude,
-  };
-
-  await _databaseHelper.insertAttendance(attendanceData);
-
-  setState(() {
-    isCheckedIn = true;
-  });
-}
-
-void checkOut() async {
-  String outime = '${_currentTime.year}-${_currentTime.month}-${_currentTime.day} ${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}';
-
-  List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
-
   Map<String, double?>? location = await LocationUtil.getLocation(context);
 
   if (location == null || location['latitude'] == null || location['longitude'] == null) {
@@ -181,7 +177,26 @@ void checkOut() async {
   double latitude = location['latitude']!;
   double longitude = location['longitude']!;
 
-  if (todayAttendance.isNotEmpty && todayAttendance.first['isCheckIn'] == 0) {
+  await getLocationName(latitude, longitude);
+
+  setState(() {
+    isCheckedIn = true;
+  });
+}
+
+  void checkOut() async {
+    String outime = '${_currentTime.year}-${_currentTime.month}-${_currentTime.day} ${_currentTime.hour}:${_currentTime.minute}:${_currentTime.second}';
+
+    List<Map<String, dynamic>> todayAttendance = await fetchAttendanceData();
+
+     String formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+   bool hasCheckedInToday = todayAttendance.any((record) {
+    DateTime recordDate = DateTime.parse(record['exactdate']);
+    String recordFormattedDate = DateFormat('yyyy-MM-dd').format(recordDate);
+    return recordFormattedDate == formattedDate;
+  });
+
+  if (hasCheckedInToday) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('You have already checked out for today.'),
@@ -191,59 +206,74 @@ void checkOut() async {
     return;
   }
 
-  await getLocationName(latitude, longitude);
 
-  Map<String, dynamic> attendanceData = {
-    'date': formattedDate,
-    'time': outime,
-    'isCheckIn': 0,
-    'latitude': latitude,
-    'longitude': longitude,
-  };
+    Map<String, double?>? location = await LocationUtil.getLocation(context);
 
-  await _databaseHelper.insertAttendance(attendanceData);
-
-  setState(() {
-    isCheckedIn = false;
-  });
-
-  attendanceValues(outime: outime);
-}
-
-void attendanceValues({required String outime}) async {
-  Map<String, dynamic> attendanceValues = {
-    'companyID': '10',
-    'empcode': userData.userID,
-    'exactdate': formattedDate,
-    'intime': intime,
-    'outtime': outime,
-    'location': locationName,
-  };
-
-  String jsonData = jsonEncode(attendanceValues);
-
-  String url = 'http://192.168.1.116:3000/attendance/time';
-
-  try {
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${userData.token}',
-      },
-      body: jsonData,
-    );
-
-    if (response.statusCode == 200) {
-      print('Out time posted successfully');
-    } else {
-      print('Failed to post out time: ${response.statusCode}');
+    if (location == null || location['latitude'] == null || location['longitude'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to retrieve location. Please try again.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
     }
-  } catch (e) {
-    print('Exception while posting out time: $e');
-  }
-}
 
+    double latitude = location['latitude']!;
+    double longitude = location['longitude']!;
+
+   
+    await getLocationName(latitude, longitude);
+
+    Map<String, dynamic> attendanceData = {
+      'date': formattedDate,
+      'time': outime,
+      'isCheckIn': 0,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
+
+    setState(() {
+      isCheckedIn = false;
+    });
+
+    attendanceValues(outime: outime);
+  }
+
+  void attendanceValues({required String outime}) async {
+    Map<String, dynamic> attendanceValues = {
+      'companyID': '10',
+      'empcode': userData.userID,
+      'exactdate': formattedDate,
+      'intime': intime,
+      'outtime': outime,
+      'location': locationName,
+    };
+
+    String jsonData = jsonEncode(attendanceValues);
+
+    String url = 'http://192.168.1.7:3000/attendance/time';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${userData.token}',
+        },
+        body: jsonData,
+      );
+
+      if (response.statusCode == 200) {
+        print('Out time posted successfully');
+        _clearIntime();
+      } else {
+        print('Failed to post out time: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Exception while posting out time: $e');
+    }
+  }
 
   void showCheckInSnackBar() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -254,51 +284,51 @@ void attendanceValues({required String outime}) async {
     );
   }
 
-  void viewAttendance() async {
-    List<Map<String, dynamic>> todayAttendance = await _databaseHelper.getAttendanceByDate(formattedDate);
+  // void viewAttendance() async {
+  //   List<Map<String, dynamic>> todayAttendance = await fetchAttendanceData();
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Today\'s Attendance'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Date: $formattedDate',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              if (todayAttendance.isEmpty)
-                const Text('No attendance recorded for today.')
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: todayAttendance.map((record) {
-                    String time = record['time'];
-                    bool isCheckIn = record['isCheckIn'] == 1;
+  //   showDialog(
+  //     context: context,
+  //     builder: (BuildContext context) {
+  //       return AlertDialog(
+  //         title: const Text('Today\'s Attendance'),
+  //         content: Column(
+  //           mainAxisSize: MainAxisSize.min,
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Text(
+  //               'Date: $formattedDate',
+  //               style: const TextStyle(fontWeight: FontWeight.bold),
+  //             ),
+  //             const SizedBox(height: 10),
+  //             if (todayAttendance.isEmpty)
+  //               const Text('No attendance recorded for today.')
+  //             else
+  //               Column(
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: todayAttendance.map((record) {
+  //                   String time = record['time'];
+  //                   bool isCheckIn = record['isCheckIn'] == 1;
 
-                    return Text(
-                      '$time - ${isCheckIn ? 'Checked In' : 'Checked Out'}',
-                    );
-                  }).toList(),
-                ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  //                   return Text(
+  //                     '$time - ${isCheckIn ? 'Checked In' : 'Checked Out'}',
+  //                   );
+  //                 }).toList(),
+  //               ),
+  //           ],
+  //         ),
+  //         actions: <Widget>[
+  //           TextButton(
+  //             onPressed: () {
+  //               Navigator.of(context).pop();
+  //             },
+  //             child: const Text('Close'),
+  //           ),
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -538,11 +568,11 @@ void attendanceValues({required String outime}) async {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: viewAttendance,
-        backgroundColor: const Color.fromARGB(255, 86, 125, 244),
-        child: const Icon(Icons.remove_red_eye, color: Colors.white),
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: viewAttendance,
+      //   backgroundColor: const Color.fromARGB(255, 86, 125, 244),
+      //   child: const Icon(Icons.remove_red_eye, color: Colors.white),
+      // ),
     );
   }
 }
