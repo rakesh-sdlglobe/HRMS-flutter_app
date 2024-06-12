@@ -99,7 +99,7 @@ exports.fetchLeave = (req, res) => {
   const { empcode } = req.body; 
 
   const fetchSql = `
-    SELECT leaveid, fromdate, todate, createddate, approvel_status
+    SELECT leaveid, fromdate, todate, createddate, approvel_status, leave_status
     FROM tbl_leave_apply_leave
     WHERE empcode = @empcode
   `;
@@ -117,9 +117,70 @@ exports.fetchLeave = (req, res) => {
         fromdate: record.fromdate,
         todate: record.todate,
         createddate: record.createddate,
-        approvel_status: record.approvel_status ? 'Approved' : 'Pending'
+        approvel_status: record.approvel_status ? 'Approved' : 'Pending',
+        leave_status: record.leave_status
       }));
-
       res.status(200).json({ leaveRecords });
     });
 };
+
+
+exports.leaveToApprove =(req,res)=>{
+  const { empcode } = req.body; 
+
+  const fetchSql = `
+  SELECT empcode, leaveid, fromdate, todate, createddate, approvel_status, leave_status
+  FROM tbl_leave_apply_leave
+  WHERE approvel_status = 0 and empcode='EIN1129' and leave_status != 3
+  `;
+
+  pool.request()
+    .input('empcode', empcode)
+    .query(fetchSql, (fetchErr, fetchResult) => {
+      if (fetchErr) {
+        console.error('Error fetching leave records: ', fetchErr);
+        return res.status(500).json({ message: 'Error fetching leave records' });
+      }
+
+      const leaveRecords = fetchResult.recordset.map(record => ({
+        empcode:record.empcode,
+        leaveType: record.leaveid,
+        leaveid:record.leaveid,
+        fromdate: record.fromdate,
+        todate: record.todate,
+        createddate: record.createddate,
+        approvel_status: record.approvel_status ? 'Approved' : 'Pending',
+        leave_status:record.leave_status 
+      }));
+      res.status(200).json({ leaveRecords });
+    });
+}
+
+
+exports.leaveApprove = (req, res) => {
+  const { leaveid, empcode, approve } = req.body;
+  const approvalStatus = approve ? 1 : 0;
+  const leaveStatus = approve ? 6 : 3; 
+
+  const updateSql = `
+    UPDATE tbl_leave_apply_leave
+    SET approvel_status = @approvalStatus, leave_status = @leaveStatus
+    WHERE leaveid = @leaveid AND empcode = @empcode
+  `;
+
+  pool.request()
+    .input('leaveid', leaveid)
+    .input('empcode', empcode)
+    .input('approvalStatus', approvalStatus)
+    .input('leaveStatus', leaveStatus)
+    .query(updateSql, (updateErr, updateResult) => {
+      if (updateErr) {
+        console.error('Error updating leave record: ', updateErr);
+        return res.status(500).json({ message: 'Error updating leave record', error: updateErr });
+      }
+
+      res.status(200).json({ message: 'Leave record updated successfully' });
+    });
+};
+
+
