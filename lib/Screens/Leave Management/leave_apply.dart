@@ -75,10 +75,11 @@ class _LeaveApplyState extends State<LeaveApply> {
 
   void applyLeave() async {
     String onDate = oneDateController.text;
+    String todate = toDateController.text;
     String reason = descriptionController.text;
     String days = daysController.text;
 
-    // Determine the half-day value based on isFullDay
+    // Determine the half day value based on isFullDay
     int halfDay = isFullDay ? 0 : 1;
 
     // Initialize start and end time strings
@@ -99,21 +100,8 @@ class _LeaveApplyState extends State<LeaveApply> {
 
     int leaveId = installment == 'Casual Leave' ? 1 : 3;
 
-    // Determine the correct from date and to date based on isFullDay and leave type
-    String fromdate = isFullDay ? fromDateController.text : onDate;
-    String toDate = isFullDay ? toDateController.text : onDate;
-
-    if (installment == 'Casual Leave') {
-      // For casual leave, set fromdate and toDate to the same date
-      fromDateController.text = onDate;
-      toDateController.text = onDate;
-      fromdate = onDate;
-      toDate = onDate;
-    }
-
-    // Append time to fromdate and toDate
-    fromdate += ' $startTime';
-    toDate += ' $endTime';
+    String fromdate =
+        installment == 'Casual Leave' ? onDate : fromDateController.text;
 
     Map<String, dynamic> leaveValues = {
       'company_id': '10',
@@ -121,24 +109,26 @@ class _LeaveApplyState extends State<LeaveApply> {
       'leaveid': leaveId,
       'leavemode': 1,
       'reason': reason,
-      'fromdate': fromdate,
-      'todate': toDate,
+      'fromdate': !isFullDay ? startTime : fromdate,
+      'todate': !isFullDay ? endTime : todate,
       'half': halfDay,
       'no_of_days': numberOfDays,
       'leave_adjusted': 0,
       'approvel_status': 0,
-      'leave_status': 1,
+      'leave_status': 0,
       'flag': 1,
       'status': 1,
       'createddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
       'createdby': userData.userID,
       'modifieddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
       'modifiedby': userData.userID,
+      'start_time': startTime, 
+      'end_time': endTime, 
     };
 
     String jsonData = jsonEncode(leaveValues);
 
-    String url = 'http://192.168.1.14:3000/leave/apply';
+    String url = 'http://192.168.1.7:3000/leave/apply';
 
     try {
       final response = await http.post(
@@ -152,6 +142,7 @@ class _LeaveApplyState extends State<LeaveApply> {
 
       if (response.statusCode == 200) {
         print('Leave posted successfully');
+        toast('Leave applied successfully');
       } else {
         print('Failed to post leave: ${response.statusCode}');
       }
