@@ -20,18 +20,32 @@ class LeaveApplication extends StatefulWidget {
 class _LeaveApplicationState extends State<LeaveApplication> {
   late UserData userData;
   List<LeaveData> leaveData = [];
+  late Future<void> _fetchLeaveData;
 
   @override
   void initState() {
     super.initState();
     userData = Provider.of<UserData>(context, listen: false);
-    fetchLeaveData();
+     userData = Provider.of<UserData>(context, listen: false);
+      WidgetsBinding.instance!.addPostFrameCallback((_) {
+      if (userData.isTokenLoaded) {
+         fetchLeaveData();
+      } else {
+        userData.addListener(() {
+          if (userData.isTokenLoaded) {
+            setState(() {
+              fetchLeaveData();
+            });
+          }
+        });
+      }
+    });
   }
 
   Future<void> fetchLeaveData() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.1.14:3000/leave/get'),
+        Uri.parse('http://192.168.1.7:3000/leave/get'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${userData.token}',
@@ -43,10 +57,10 @@ class _LeaveApplicationState extends State<LeaveApplication> {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        print('Server Response: $jsonData'); // Debugging statement
         final List<dynamic> leaveRecords = jsonData['leaveRecords'];
         setState(() {
           leaveData = List<LeaveData>.from(leaveRecords.map((record) {
+            print(record['leave_status']);
             String leaveType;
             if (record['leaveType'] == 1) {
               leaveType = 'Casual';
@@ -62,7 +76,12 @@ class _LeaveApplicationState extends State<LeaveApplication> {
                   '${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(record['fromdate']))} to ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(record['todate']))}' ??
                       '',
               applyDate: record['createddate'] ?? '',
-              status: record['approvel_status'],
+              status: record['leave_status'] == 3
+    ? "Rejected"
+    : record['approvel_status'] == "Approved"
+        ? "Approved"
+        : "Pending",
+
             );
           }));
         });
@@ -75,44 +94,63 @@ class _LeaveApplicationState extends State<LeaveApplication> {
     }
   }
 
-  void editLeave(BuildContext context, String leaveType, String dateRange, String applyDate) {
-  String halfDayDateRange = ''; // Variable to store half-day date range
-  String fullDayDateRange = ''; // Variable to store full-day date range
-  
-  // Logic to classify date range based on leave type
-  if (leaveType == 'Casual') {
-    if (dateRange.contains('(Full Day)')) {
-      fullDayDateRange = dateRange;
+  void editLeave(BuildContext context, String leaveType, String dateRange,
+      String applyDate) {
+    String halfDayDateRange = ''; // Variable to store half-day date range
+    String fullDayDateRange = ''; // Variable to store full-day date range
+
+    // Logic to classify date range based on leave type
+    if (leaveType == 'Casual') {
+      if (dateRange.contains('(Full Day)')) {
+        fullDayDateRange = dateRange;
+      } else {
+        halfDayDateRange = dateRange;
+      }
     } else {
-      halfDayDateRange = dateRange;
+      fullDayDateRange = dateRange;
     }
-  } else {
-    fullDayDateRange = dateRange;
-  }
-  
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => EditLeavePage(
-        leaveType: leaveType,
-        halfDayDateRange: halfDayDateRange,
-        fullDayDateRange: fullDayDateRange,
-        applyDate: applyDate,
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditLeavePage(
+          leaveType: leaveType,
+          halfDayDateRange: halfDayDateRange,
+          fullDayDateRange: fullDayDateRange,
+          applyDate: applyDate,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => const LeaveApply().launch(context),
-        backgroundColor: kMainColor,
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
-        ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () {
+              setState(() {
+                _fetchLeaveData = fetchLeaveData();
+              });
+            },
+            backgroundColor: kMainColor,
+            child: const Icon(
+              Icons.refresh,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 20.0),
+          FloatingActionButton(
+            onPressed: () => const LeaveApply().launch(context),
+            backgroundColor: kMainColor,
+            child: const Icon(
+              Icons.add,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
