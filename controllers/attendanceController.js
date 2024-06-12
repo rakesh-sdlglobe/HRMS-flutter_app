@@ -24,7 +24,7 @@ exports.fetchAttendance = (req, res) => {
   const { empcode } = req.body;
 
   const fetchSql = `
-    SELECT CONVERT(VARCHAR, exactdate, 23) AS date, intime, outtime
+    SELECT CONVERT(VARCHAR, exactdate, 23) AS date, intime, outtime, exactdate
     FROM tbl_attendance_login_logout
     WHERE empcode = @empcode
   `;
@@ -40,7 +40,8 @@ exports.fetchAttendance = (req, res) => {
       const attendanceRecords = fetchResult.recordset.map(record => ({
         date: record.date,
         intime: record.intime,
-        outtime: record.outtime
+        outtime: record.outtime,
+        exactdate: record.exactdate
       }));
 
       res.status(200).json({ attendanceRecords });
