@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:hrm_employee/providers/user_provider.dart';
 import 'package:provider/provider.dart';
-  import 'package:intl/intl.dart';
+import 'package:intl/intl.dart';
 
 
 class AttendanceStorage extends StatefulWidget {
@@ -17,7 +17,7 @@ class AttendanceStorage extends StatefulWidget {
 
 class _AttendanceStorageState extends State<AttendanceStorage> {
   late UserData userData;
-  late Future<List<Map<String, dynamic>>> _attendanceData;
+  Future<List<Map<String, dynamic>>>? _attendanceData;
   DateTime selectedDate = DateTime.now();
   int presentDays = 0;
   int absentDays = 0;
@@ -26,13 +26,25 @@ class _AttendanceStorageState extends State<AttendanceStorage> {
   void initState() {
     super.initState();
     userData = Provider.of<UserData>(context, listen: false);
-    _attendanceData = fetchAttendanceData();
+    WidgetsBinding.instance!.addPostFrameCallback((_) {
+      if (userData.isTokenLoaded) {
+        _attendanceData = fetchAttendanceData();
+      } else {
+        userData.addListener(() {
+          if (userData.isTokenLoaded) {
+            setState(() {
+              _attendanceData = fetchAttendanceData();
+            });
+          }
+        });
+      }
+    });
   }
 
   Future<List<Map<String, dynamic>>> fetchAttendanceData() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.1.116:3000/attendance/get'),
+        Uri.parse('http://192.168.1.7:3000/attendance/get'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${userData.token}',
@@ -55,23 +67,20 @@ class _AttendanceStorageState extends State<AttendanceStorage> {
     }
   }
 
-
-
-String formatTime(String dateTime) {
-  try {
-    DateTime parsedDateTime = DateTime.parse(dateTime);
-    return DateFormat('HH:mm').format(parsedDateTime);
-  } catch (e) {
-    return '-';
+  String formatTime(String dateTime) {
+    try {
+      DateTime parsedDateTime = DateTime.parse(dateTime);
+      return DateFormat('HH:mm').format(parsedDateTime);
+    } catch (e) {
+      return '-';
+    }
   }
-}
 
-String getStatus(Map<String, dynamic> attendance) {
-  bool hasCheckIn = attendance['intime'] != null;
-  bool hasCheckOut = attendance['outtime'] != null;
-  return (hasCheckIn && hasCheckOut) ? 'Present' : 'Absent';
-}
-
+  String getStatus(Map<String, dynamic> attendance) {
+    bool hasCheckIn = attendance['intime'] != null;
+    bool hasCheckOut = attendance['outtime'] != null;
+    return (hasCheckIn && hasCheckOut) ? 'Present' : 'Absent';
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -86,7 +95,6 @@ String getStatus(Map<String, dynamic> attendance) {
       });
     }
   }
-
   @override
 Widget build(BuildContext context) {
   presentDays = 0; // Reset presentDays
