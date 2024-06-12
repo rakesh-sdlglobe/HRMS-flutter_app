@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:hrm_employee/GlobalComponents/button_global.dart';
+import 'package:hrm_employee/Screens/Admin%20Dashboard/admin_home.dart';
 import 'package:hrm_employee/constant.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -29,34 +30,48 @@ class _SignInState extends State<SignIn> {
   @override
   void initState() {
     super.initState();
-    checkLoggedIn(); // Check if user is already logged in on screen initialization
+    // checkLoggedIn(); // Check if user is already logged in on screen initialization
   }
 
-  Future<void> checkLoggedIn() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('token');
-    if (token != null) {
-      // User is already logged in, navigate to home screen
-      Navigator.pushReplacement(
-        // ignore: use_build_context_synchronously
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    }
-  }
+  // Future<void> checkLoggedIn() async {
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   String? token = prefs.getString('token');
+  //   if (token != null) {
+  //     // Validate the token format
+  //     if (validateToken(token)) {
+  //       // User is already logged in, navigate to home screen
+  //       Navigator.pushReplacement(
+  //         context,
+  //         MaterialPageRoute(builder: (context) => const HomeScreen()),
+  //       );
+  //     } else {
+  //       await clearUserData();
+  //     }
+  //   } else {
+  //   }
+  // }
+
+  // bool validateToken(String token) {
+  //   final parts = token.split('.');
+  //   if (parts.length != 3) {
+  //     return false;
+  //   }
+  //   // Additional validation can be done here if necessary
+  //   return true;
+  // }
 
   Future<void> signIn() async {
-    String hashedPassword = passwordController.text;
+    String password = passwordController.text;
     String userID = userIDController.text;
 
     var response = await http.post(
-      Uri.parse('http://192.168.1.116:3000/auth/login'),
+      Uri.parse('http://192.168.1.7:3000/auth/login'),
       headers: <String, String>{
         'Content-Type': 'application/json; charset=UTF-8',
       },
       body: jsonEncode(<String, String>{
         'userID': userID,
-        'password': hashedPassword,
+        'password': password,
       }),
     );
 
@@ -64,26 +79,49 @@ class _SignInState extends State<SignIn> {
       final Map<String, dynamic> responseData = json.decode(response.body);
       String token = responseData['token'];
       String userID = responseData['userID'];
-      await storeUserData(token, userID);
+      String role = responseData['role'].toString();
+
+      await storeUserData(token, userID, role);
 
       UserData userData = context.read<UserData>();
-      userData.setUserData(token, userID);
+      userData.setUserData(token, userID, role);
 
+      if(role=="3"){
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AdminDashboard(),
+        ),
+      );
+      } else{
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => const HomeScreen(),
         ),
       );
+      }
+
+      
     } else {
-      print('Login failed');
+      debugPrint('Login failed: ${response.body}');
     }
   }
 
-  Future<void> storeUserData(String token, String userID) async {
+  Future<void> storeUserData(String token, String userID, String role) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
     await prefs.setString('userID', userID);
+    await prefs.setString('role', role);
+
+  }
+
+  Future<void> clearUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove('token');
+    await prefs.remove('userID');
+    await prefs.remove('role');
+
   }
 
   @override
@@ -243,7 +281,7 @@ class _SignInState extends State<SignIn> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const SignUp(),
+                                      builder: (context) => const AdminDashboard(),
                                     ),
                                   );
                                 },
