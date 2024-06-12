@@ -298,10 +298,10 @@ class _EditLeavePageState extends State<EditLeavePage> {
                               firstDate: DateTime(1900),
                               lastDate: DateTime(2100),
                             );
-                            oneDateController.text =
+                            fromDateController.text =
                                 date.toString().substring(0, 10);
                           },
-                          controller: oneDateController,
+                          controller: fromDateController,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
                             floatingLabelBehavior: FloatingLabelBehavior.always,
