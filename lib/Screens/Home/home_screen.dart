@@ -12,33 +12,86 @@ import 'package:hrm_employee/Screens/Notification/notification_screen.dart';
 import 'package:hrm_employee/Screens/Outwork%20Submission/outwork_list.dart';
 import 'package:hrm_employee/Screens/Salary%20Management/salary_statement_list.dart';
 import 'package:hrm_employee/Screens/Work%20Report/daily_work_report.dart';
+import 'package:hrm_employee/providers/user_provider.dart';
 import 'package:nb_utils/nb_utils.dart';
 import 'package:flutter_feather_icons/flutter_feather_icons.dart';
+import 'package:provider/provider.dart';
 import '../../GlobalComponents/button_global.dart';
 import '../../constant.dart';
 import '../Attendance Management/management_screen.dart';
+
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  // ignore: library_private_types_in_public_api
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late UserData userData;
+  var userName = "";
+
+  @override
+  void initState() {
+    super.initState();
+    userData = Provider.of<UserData>(context, listen: false);
+    WidgetsBinding.instance!.addPostFrameCallback((_) {
+      if (userData.isTokenLoaded) {
+        fetchUserName();
+      } else {
+        userData.addListener(() {
+          if (userData.isTokenLoaded) {
+            setState(() {
+              fetchUserName();
+            });
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> fetchUserName() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.1.7:3000/auth/getUser'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${userData.token}',
+        },
+        body: json.encode({
+          'empcode': userData.userID,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          userName = json.decode(response.body)['empName'];
+        });
+      } else {
+        throw Exception('Failed to load user data');
+      }
+    } catch (error) {
+      // Handle error here, e.g., show a message to the user
+    }
+  }
+
   void logout(BuildContext context) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    // Clear any user data stored in SharedPreferences
-    prefs.clear();
-    // Navigate to the login screen and remove all previous routes
-    // ignore: use_build_context_synchronously
+    var userData = Provider.of<UserData>(context, listen: false);
+    await userData.clearUserData();
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const SignIn()),
       (Route<dynamic> route) => false,
     );
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -56,14 +109,14 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundImage: AssetImage('images/person.jpg'),
           ),
           title: Text(
-            'Hi, Ibne Riyad',
+            'Hi, $userName',
             style: kTextStyle.copyWith(color: Colors.white, fontSize: 12.0),
           ),
-          subtitle: Text(
-            'Good Morning',
-            style: kTextStyle.copyWith(
-                color: Colors.white, fontWeight: FontWeight.bold),
-          ),
+          // subtitle: Text(
+          //   'Good Morning',
+          //   style: kTextStyle.copyWith(
+          //       color: Colors.white, fontWeight: FontWeight.bold),
+          // ),
         ),
       ),
       drawer: Drawer(
@@ -104,14 +157,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             height: 10.0,
                           ),
                           Text(
-                            'Sahidul Islam',
+                            userName,
                             style: kTextStyle.copyWith(
                                 fontWeight: FontWeight.bold),
                           ),
-                          Text(
-                            'Employee',
-                            style: kTextStyle.copyWith(color: kGreyTextColor),
-                          ),
+                          // Text(
+                          //   'Employee',
+                          //   style: kTextStyle.copyWith(color: kGreyTextColor),
+                          // ),
                         ],
                       ).onTap(() {
                         // const ProfileScreen().launch(context);
