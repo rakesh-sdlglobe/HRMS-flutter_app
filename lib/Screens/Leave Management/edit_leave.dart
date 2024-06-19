@@ -1,15 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hrm_employee/providers/user_provider.dart';
 import 'package:nb_utils/nb_utils.dart';
+import 'package:provider/provider.dart';
 import '../../GlobalComponents/button_global.dart';
 import '../../constant.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 class EditLeavePage extends StatefulWidget {
   final String leaveType;
   final String halfDayDateRange;
   final String fullDayDateRange;
   final String applyDate;
+  final String reason;
+  final DateTime fromDate;
+  final DateTime toDate;
 
   const EditLeavePage({
     Key? key,
@@ -17,6 +24,9 @@ class EditLeavePage extends StatefulWidget {
     required this.halfDayDateRange,
     required this.fullDayDateRange,
     required this.applyDate,
+    required this.reason,
+    required this.toDate,
+    required this.fromDate,
   }) : super(key: key);
 
   @override
@@ -24,6 +34,7 @@ class EditLeavePage extends StatefulWidget {
 }
 
 class _EditLeavePageState extends State<EditLeavePage> {
+  late UserData userData;
   final fromDateController = TextEditingController();
   final toDateController = TextEditingController();
   final oneDateController = TextEditingController();
@@ -45,29 +56,40 @@ class _EditLeavePageState extends State<EditLeavePage> {
   @override
   void initState() {
     super.initState();
+    descriptionController.text = widget.reason;
+    fromDateController.text = widget.fromDate.toString();
+    toDateController.text = widget.toDate.toString();
     fromDateController.addListener(updateNumberOfDays);
     toDateController.addListener(updateNumberOfDays);
-    fromDateController.text = widget.fullDayDateRange.isNotEmpty
-        ? widget.fullDayDateRange.split(' to ')[0]
-        : widget.halfDayDateRange.split(' to ')[0];
-    toDateController.text = widget.fullDayDateRange.isNotEmpty
-        ? widget.fullDayDateRange.split(' to ')[1]
-        : widget.halfDayDateRange.split(' to ')[1];
-
+    // Determine if it's a full-day or half-day leave based on initial data
     if (widget.leaveType == 'Casual') {
-      installment = 'Casual Leave';
       if (widget.halfDayDateRange.isNotEmpty) {
-        isFullDay = false; // Set isFullDay to false if it's a half day
+        fromDateController.text =
+            DateFormat('yyyy-MM-dd').format(widget.fromDate);
         // Extract start time and end time
-        selectedStartTime =
-            TimeOfDay.fromDateTime(DateTime.parse(fromDateController.text));
-        selectedEndTime =
-            TimeOfDay.fromDateTime(DateTime.parse(toDateController.text));
+        selectedStartTime = TimeOfDay.fromDateTime(
+            DateTime.parse(widget.halfDayDateRange.split(' to ')[0]));
+        selectedEndTime = TimeOfDay.fromDateTime(
+            DateTime.parse(widget.halfDayDateRange.split(' to ')[1]));
+        // Check if times are all zeros
+        if (selectedStartTime!.hour == 0 &&
+            selectedStartTime!.minute == 0 &&
+            selectedEndTime!.hour == 0 &&
+            selectedEndTime!.minute == 0) {
+          isFullDay = true;
+        } else {
+          isFullDay = false;
+        }
       } else {
-        isFullDay = true; // Set isFullDay to true if it's a full day
+        isFullDay = true;
+        fromDateController.text =
+            DateFormat('yyyy-MM-dd').format(widget.fromDate);
       }
     } else {
       installment = 'Plan Leave';
+      fromDateController.text =
+          DateFormat('yyyy-MM-dd').format(widget.fromDate);
+      toDateController.text = DateFormat('yyyy-MM-dd').format(widget.toDate);
     }
   }
 
@@ -103,8 +125,97 @@ class _EditLeavePageState extends State<EditLeavePage> {
     }
   }
 
+  // ignore: non_constant_identifier_names
+  void EditLeave() async {
+    String onDate = oneDateController.text;
+    String reason = descriptionController.text;
+    String days = daysController.text;
+
+    // Determine the half-day value based on isFullDay
+    int halfDay = isFullDay ? 0 : 1;
+
+    // Initialize start and end time strings
+    String startTime = '';
+    String endTime = '';
+
+    // If it's a half-day leave, use selected start and end times
+    if (!isFullDay) {
+      startTime = selectedStartTime != null
+          ? '$onDate ${selectedStartTime!.format(context)}'
+          : 'Unknown';
+      endTime = selectedEndTime != null
+          ? '$onDate ${selectedEndTime!.format(context)}'
+          : 'Unknown';
+    }
+    int numberOfDays = days.isNotEmpty ? int.parse(days) : 0;
+
+    int leaveId = installment == 'Casual Leave' ? 1 : 3;
+
+    // Determine the correct from date and to date based on isFullDay and leave type
+    String fromdate = isFullDay ? fromDateController.text : onDate;
+    String toDate = isFullDay ? toDateController.text : onDate;
+
+    if (installment == 'Casual Leave') {
+      // For casual leave, set fromdate and toDate to the same date
+      fromDateController.text = onDate;
+      toDateController.text = onDate;
+      fromdate = onDate;
+      toDate = onDate;
+    }
+
+    fromdate += isFullDay ? '' : ' $startTime';
+    toDate += isFullDay ? '' : ' $endTime';
+
+    Map<String, dynamic> leaveValues = {
+      'company_id': '10',
+      'empcode': userData.userID,
+      'leaveid': leaveId,
+      'leavemode': 1,
+      'reason': reason,
+      'fromdate': fromdate,
+      'todate': toDate,
+      'half': halfDay,
+      'no_of_days': numberOfDays,
+      'leave_adjusted': 0,
+      'approvel_status': 0,
+      'leave_status': 1,
+      'flag': 1,
+      'status': 1,
+      'createddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
+      'createdby': userData.userID,
+      'modifieddate': DateFormat('dd-MMM-yyyy').format(DateTime.now()),
+      'modifiedby': userData.userID,
+    };
+
+    String jsonData = jsonEncode(leaveValues);
+
+    String url = 'http://192.168.2.8:3000/leave/edit';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${userData.token}',
+        },
+        body: jsonData,
+      );
+
+      if (response.statusCode == 200) {
+        print('Leave posted successfully');
+        toast('Leave posted successfully');
+      } else {
+        print('Failed to post leave: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Exception while posting leave: $e');
+      toast('Leave is not posted');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    userData = Provider.of<UserData>(context, listen: false);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
@@ -371,17 +482,17 @@ class _EditLeavePageState extends State<EditLeavePage> {
                             hintText: '11/09/2021',
                           ),
                         ),
+                        const SizedBox(height: 20.0),
+                        TextFormField(
+                          controller: daysController,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Number of days',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
                       ],
                     ),
-                  const SizedBox(height: 20.0),
-                  TextFormField(
-                    controller: daysController,
-                    readOnly: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Number of days',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
                   const SizedBox(height: 20.0),
                   TextFormField(
                     controller: remainingLeavesController,
@@ -405,10 +516,10 @@ class _EditLeavePageState extends State<EditLeavePage> {
                     height: 20.0,
                   ),
                   ButtonGlobal(
-                    buttontext: 'Apply',
+                    buttontext: 'Edit',
                     buttonDecoration:
                         kButtonDecoration.copyWith(color: kMainColor),
-                    onPressed: () {},
+                    onPressed: EditLeave,
                   )
                 ],
               ),
