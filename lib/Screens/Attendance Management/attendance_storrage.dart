@@ -7,7 +7,6 @@ import 'package:hrm_employee/providers/user_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
-
 class AttendanceStorage extends StatefulWidget {
   const AttendanceStorage({Key? key}) : super(key: key);
 
@@ -26,25 +25,14 @@ class _AttendanceStorageState extends State<AttendanceStorage> {
   void initState() {
     super.initState();
     userData = Provider.of<UserData>(context, listen: false);
-    WidgetsBinding.instance!.addPostFrameCallback((_) {
-      if (userData.isTokenLoaded) {
-        _attendanceData = fetchAttendanceData();
-      } else {
-        userData.addListener(() {
-          if (userData.isTokenLoaded) {
-            setState(() {
-              _attendanceData = fetchAttendanceData();
-            });
-          }
-        });
-      }
-    });
+    // Initial fetch of attendance data
+    _attendanceData = fetchAttendanceData();
   }
 
   Future<List<Map<String, dynamic>>> fetchAttendanceData() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.1.7:3000/attendance/get'),
+        Uri.parse('http://192.168.2.8:3000/attendance/get'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${userData.token}',
@@ -95,254 +83,286 @@ class _AttendanceStorageState extends State<AttendanceStorage> {
       });
     }
   }
-  @override
-Widget build(BuildContext context) {
-  presentDays = 0; // Reset presentDays
-  absentDays = 0; // Reset absentDays
 
-  return Scaffold(
-    appBar: AppBar(
-      backgroundColor: kMainColor,
-      elevation: 0.0,
-      iconTheme: const IconThemeData(color: Colors.white),
-      title: Text(
-        'Attendance Storage',
-        style: kTextStyle.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
+  void refreshData() {
+    setState(() {
+      _attendanceData = fetchAttendanceData();
+    });
+    // Simulate caching and automatic refresh after a delay
+    Future.delayed(const Duration(seconds: 1), () {
+      setState(() {
+        // No need to fetch data again, just updating the state to trigger UI refresh
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    presentDays = 0; // Reset presentDays
+    absentDays = 0; // Reset absentDays
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: kMainColor,
+        elevation: 0.0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          'Attendance Storage',
+          style: kTextStyle.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(10.0),
+            child: Container(
+              padding: const EdgeInsets.only(left: 8.0, right: 8.0),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white),
+                borderRadius: BorderRadius.circular(10.0),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                    style: kTextStyle.copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(width: 4.0),
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    color: Colors.white,
+                  ),
+                ],
+              ),
+            ).onTap(() => _selectDate(context)),
+          ),
+        ],
       ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.all(10.0),
-          child: Container(
-            padding: const EdgeInsets.only(left: 8.0, right: 8.0),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white),
-              borderRadius: BorderRadius.circular(10.0),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                  style: kTextStyle.copyWith(color: Colors.white),
-                ),
-                const SizedBox(width: 4.0),
-                const Icon(
-                  Icons.calendar_today_outlined,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          refreshData();
+        },
+        backgroundColor: Colors.blueAccent,
+        child: const Icon(Icons.refresh, color: Colors.white),
+      ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              color: kMainColor,
+              child: Container(
+                padding: const EdgeInsets.all(20.0),
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30.0),
+                    topRight: Radius.circular(30.0),
+                  ),
                   color: Colors.white,
                 ),
-              ],
-            ),
-          ).onTap(() => _selectDate(context)),
-        ),
-      ],
-    ),
-    floatingActionButton: FloatingActionButton(
-      onPressed: () {
-        setState(() {
-          _attendanceData = fetchAttendanceData();
-        });
-      },
-      backgroundColor: Colors.blueAccent,
-      child: const Icon(Icons.refresh, color: Colors.white),
-    ),
-    body: SingleChildScrollView(
-      child: Container(
-        color: kMainColor,
-        child: Container(
-          padding: const EdgeInsets.all(20.0),
-          decoration: const BoxDecoration(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(30.0),
-              topRight: Radius.circular(30.0),
-            ),
-            color: Colors.white,
-          ),
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: _attendanceData,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Text('No attendance records found.'));
-              } else {
-                List<Map<String, dynamic>> attendanceList = snapshot.data!;
-                Map<String, List<Map<String, dynamic>>> groupedAttendance = {};
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _attendanceData,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                          child: Text('No attendance records found.'));
+                    } else {
+                      List<Map<String, dynamic>> attendanceList =
+                          snapshot.data!;
+                      Map<String, List<Map<String, dynamic>>>
+                          groupedAttendance = {};
 
-                // Grouping attendance by date
-                attendanceList.forEach((attendance) {
-                  String date = attendance['date'] ?? 'Unknown Date';
-                  if (!groupedAttendance.containsKey(date)) {
-                    groupedAttendance[date] = [];
-                  }
-                  groupedAttendance[date]!.add(attendance);
-                });
+                      // Grouping attendance by date
+                      attendanceList.forEach((attendance) {
+                        String date = attendance['date'] ?? 'Unknown Date';
+                        if (!groupedAttendance.containsKey(date)) {
+                          groupedAttendance[date] = [];
+                        }
+                        groupedAttendance[date]!.add(attendance);
+                      });
 
-                groupedAttendance.forEach((date, attendances) {
-                  bool hasCheckedIn = attendances.any((attendance) => attendance['intime'] != null);
-                  bool hasCheckedOut = attendances.any((attendance) => attendance['outtime'] != null);
-                  if (hasCheckedIn && hasCheckedOut) {
-                    presentDays++;
-                  } else {
-                    absentDays++;
-                  }
-                });
+                      groupedAttendance.forEach((date, attendances) {
+                        bool hasCheckedIn = attendances
+                            .any((attendance) => attendance['intime'] != null);
+                        bool hasCheckedOut = attendances
+                            .any((attendance) => attendance['outtime'] != null);
+                        if (hasCheckedIn && hasCheckedOut) {
+                          presentDays++;
+                        } else {
+                          absentDays++;
+                        }
+                      });
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 20.0),
-                    Material(
-                      elevation: 2.0,
-                      borderRadius: BorderRadius.circular(20.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(10.0),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20.0),
-                          color: Colors.white,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 10.0),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      'Date',
-                                      style: kTextStyle.copyWith(
-                                        fontWeight: FontWeight.bold,
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 20.0),
+                          Material(
+                            elevation: 2.0,
+                            borderRadius: BorderRadius.circular(20.0),
+                            child: Container(
+                              padding: const EdgeInsets.all(10.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20.0),
+                                color: Colors.white,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 10.0),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Center(
+                                          child: Text(
+                                            'Date',
+                                            style: kTextStyle.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
                                       ),
+                                      Expanded(
+                                        child: Center(
+                                          child: Text(
+                                            'In Time',
+                                            style: kTextStyle.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Center(
+                                          child: Text(
+                                            'Out Time',
+                                            style: kTextStyle.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Center(
+                                          child: Text(
+                                            'Status',
+                                            style: kTextStyle.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.all(10.0),
+                                    child: Divider(
+                                      color: kBorderColorTextField,
+                                      thickness: 1.0,
                                     ),
                                   ),
-                                ),
-                                Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      'In Time',
-                                      style: kTextStyle.copyWith(
-                                        fontWeight: FontWeight.bold,
+                                  ...groupedAttendance.entries.map((entry) {
+                                    String date = entry.key;
+                                    List<Map<String, dynamic>> attendances =
+                                        entry.value;
+
+                                    // Assuming there's only one check-in and one check-out entry per date
+                                    Map<String, dynamic> checkIn =
+                                        attendances.firstWhere(
+                                      (attendance) =>
+                                          attendance['intime'] != null,
+                                      orElse: () => {},
+                                    );
+                                    Map<String, dynamic> checkOut =
+                                        attendances.firstWhere(
+                                      (attendance) =>
+                                          attendance['outtime'] != null,
+                                      orElse: () => {},
+                                    );
+
+                                    String inTime = checkIn.isNotEmpty
+                                        ? formatTime(checkIn['intime'])
+                                        : '-';
+                                    String outTime = checkOut.isNotEmpty
+                                        ? formatTime(checkOut['outtime'])
+                                        : '-';
+
+                                    return Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 10.0),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Center(
+                                              child: Text(
+                                                date,
+                                                style: kTextStyle.copyWith(
+                                                  color: kGreyTextColor,
+                                                  fontSize: 12.0,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Center(
+                                              child: Text(
+                                                inTime,
+                                                style: kTextStyle.copyWith(
+                                                  color: kGreyTextColor,
+                                                  fontSize: 12.0,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Center(
+                                              child: Text(
+                                                outTime,
+                                                style: kTextStyle.copyWith(
+                                                  color: kGreyTextColor,
+                                                  fontSize: 12.0,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Center(
+                                              child: Text(
+                                                getStatus(checkIn),
+                                                style: kTextStyle.copyWith(
+                                                  color: getStatus(checkIn) ==
+                                                          'Present'
+                                                      ? Colors.green
+                                                      : Colors.redAccent,
+                                                  fontSize: 10.0,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      'Out Time',
-                                      style: kTextStyle.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      'Status',
-                                      style: kTextStyle.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.all(10.0),
-                              child: Divider(
-                                color: kBorderColorTextField,
-                                thickness: 1.0,
+                                    );
+                                  }).toList(),
+                                ],
                               ),
                             ),
-                            ...groupedAttendance.entries.map((entry) {
-                              String date = entry.key;
-                              List<Map<String, dynamic>> attendances = entry.value;
-
-                              // Assuming there's only one check-in and one check-out entry per date
-                              Map<String, dynamic> checkIn = attendances.firstWhere(
-                                (attendance) => attendance['intime'] != null,
-                                orElse: () => {},
-                              );
-                              Map<String, dynamic> checkOut = attendances.firstWhere(
-                                (attendance) => attendance['outtime'] != null,
-                                orElse: () => {},
-                              );
-
-                              String inTime = checkIn.isNotEmpty ? formatTime(checkIn['intime']) : '-';
-                              String outTime = checkOut.isNotEmpty ? formatTime(checkOut['outtime']) : '-';
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 10.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          date,
-                                          style: kTextStyle.copyWith(
-                                            color: kGreyTextColor,
-                                            fontSize: 12.0,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          inTime,
-                                          style: kTextStyle.copyWith(
-                                            color: kGreyTextColor,
-                                            fontSize: 12.0,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          outTime,
-                                          style: kTextStyle.copyWith(
-                                            color: kGreyTextColor,
-                                            fontSize: 12.0,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Center(
-                                        child: Text(
-                                          getStatus(checkIn),
-                                          style: kTextStyle.copyWith(
-                                            color: getStatus(checkIn) == 'Present'
-                                                ? Colors.green
-                                                : Colors.redAccent,
-                                            fontSize: 10.0,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-            },
+                          ),
+                        ],
+                      );
+                    }
+                  },
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
-    ),
-  );
-}
+    );
+  }
 }
