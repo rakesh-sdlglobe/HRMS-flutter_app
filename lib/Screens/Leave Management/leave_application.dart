@@ -4,9 +4,7 @@ import 'package:hrm_employee/providers/user_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:hrm_employee/main.dart';
 import 'package:hrm_employee/Screens/Leave%20Management/edit_leave.dart';
-import 'package:hrm_employee/Screens/Leave%20Management/leave_apply.dart';
 import 'package:nb_utils/nb_utils.dart';
 import '../../constant.dart';
 
@@ -20,16 +18,14 @@ class LeaveApplication extends StatefulWidget {
 class _LeaveApplicationState extends State<LeaveApplication> {
   late UserData userData;
   List<LeaveData> leaveData = [];
-  late Future<void> _fetchLeaveData;
 
   @override
   void initState() {
     super.initState();
     userData = Provider.of<UserData>(context, listen: false);
-     userData = Provider.of<UserData>(context, listen: false);
-      WidgetsBinding.instance!.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (userData.isTokenLoaded) {
-         fetchLeaveData();
+        fetchLeaveData();
       } else {
         userData.addListener(() {
           if (userData.isTokenLoaded) {
@@ -45,7 +41,7 @@ class _LeaveApplicationState extends State<LeaveApplication> {
   Future<void> fetchLeaveData() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.1.7:3000/leave/get'),
+        Uri.parse('http://192.168.2.8:3000/leave/get'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${userData.token}',
@@ -57,10 +53,10 @@ class _LeaveApplicationState extends State<LeaveApplication> {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
+        print('Server Response: $jsonData');
         final List<dynamic> leaveRecords = jsonData['leaveRecords'];
         setState(() {
           leaveData = List<LeaveData>.from(leaveRecords.map((record) {
-            print(record['leave_status']);
             String leaveType;
             if (record['leaveType'] == 1) {
               leaveType = 'Casual';
@@ -76,12 +72,10 @@ class _LeaveApplicationState extends State<LeaveApplication> {
                   '${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(record['fromdate']))} to ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(record['todate']))}' ??
                       '',
               applyDate: record['createddate'] ?? '',
-              status: record['leave_status'] == 3
-    ? "Rejected"
-    : record['approvel_status'] == "Approved"
-        ? "Approved"
-        : "Pending",
-
+              status: record['approvel_status'],
+              reason: record['reason'],
+              fromDate: DateTime.parse(record['fromdate']),
+              toDate: DateTime.parse(record['todate']),     
             );
           }));
         });
@@ -95,7 +89,7 @@ class _LeaveApplicationState extends State<LeaveApplication> {
   }
 
   void editLeave(BuildContext context, String leaveType, String dateRange,
-      String applyDate) {
+      String applyDate, String reason,DateTime fromDate, DateTime toDate) {
     String halfDayDateRange = ''; // Variable to store half-day date range
     String fullDayDateRange = ''; // Variable to store full-day date range
 
@@ -118,40 +112,48 @@ class _LeaveApplicationState extends State<LeaveApplication> {
           halfDayDateRange: halfDayDateRange,
           fullDayDateRange: fullDayDateRange,
           applyDate: applyDate,
+          reason: reason,
+          fromDate: fromDate,
+          toDate: toDate,
         ),
       ),
     );
   }
 
+  Future<void> _handleRefresh() async {
+    await Future.delayed(const Duration(seconds: 2));
+    setState(() {
+      leaveData = fetchLeaveData() as List<LeaveData>;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: () {
-              setState(() {
-                _fetchLeaveData = fetchLeaveData();
-              });
-            },
-            backgroundColor: kMainColor,
-            child: const Icon(
-              Icons.refresh,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 20.0),
-          FloatingActionButton(
-            onPressed: () => const LeaveApply().launch(context),
-            backgroundColor: kMainColor,
-            child: const Icon(
-              Icons.add,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
+      // floatingActionButton: Column(
+      //   mainAxisAlignment: MainAxisAlignment.end,
+      //   children: [
+      //     FloatingActionButton(
+      //       onPressed: () {
+      //         setState(() {});
+      //       },
+      //       backgroundColor: kMainColor,
+      //       child: const Icon(
+      //         Icons.refresh,
+      //         color: Colors.white,
+      //       ),
+      //     ),
+      //     const SizedBox(height: 20.0),
+      //     FloatingActionButton(
+      //       onPressed: () => const LeaveApply().launch(context),
+      //       backgroundColor: kMainColor,
+      //       child: const Icon(
+      //         Icons.add,
+      //         color: Colors.white,
+      //       ),
+      //     ),
+      //   ],
+      // ),
       resizeToAvoidBottomInset: false,
       backgroundColor: kMainColor,
       appBar: AppBar(
@@ -167,64 +169,74 @@ class _LeaveApplicationState extends State<LeaveApplication> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        actions: const [
-          Image(
-            image: AssetImage('images/employeesearch.png'),
-          ),
-        ],
+        // actions: const [
+        //   Image(
+        //     image: AssetImage('images/employeesearch.png'),
+        //   ),
+        // ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(
-            height: 20.0,
-          ),
-          Expanded(
-            child: Container(
-              width: context.width(),
-              padding: const EdgeInsets.all(20.0),
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30.0),
-                  topRight: Radius.circular(30.0),
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(
+              height: 20.0,
+            ),
+            Expanded(
+              child: Container(
+                width: context.width(),
+                padding: const EdgeInsets.all(20.0),
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30.0),
+                    topRight: Radius.circular(30.0),
+                  ),
+                  color: Colors.white,
                 ),
-                color: Colors.white,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(
-                      height: 20.0,
-                    ),
-                    for (var leave in leaveData)
-                      Column(
-                        children: [
-                          LeaveData(
-                            leaveType: leave.leaveType,
-                            dateRange: leave.dateRange,
-                            applyDate: leave.applyDate,
-                            status: leave.status,
-                            onEdit: () {
-                              editLeave(
-                                context,
-                                leave.leaveType,
-                                leave.dateRange,
-                                leave.applyDate,
-                              );
-                            },
-                          ),
-                          const SizedBox(
-                            height: 10.0,
-                          ), // Add space between entries
-                        ],
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        height: 20.0,
                       ),
-                  ],
+                      for (var leave in leaveData)
+                        Column(
+                          children: [
+                            LeaveData(
+                              leaveType: leave.leaveType,
+                              dateRange: leave.dateRange,
+                              applyDate: leave.applyDate,
+                              status: leave.status,
+                              reason: leave.reason,
+                              fromDate: leave.fromDate,
+                              toDate: leave.toDate,
+                              onEdit: () {
+                                editLeave(
+                                    context,
+                                    leave.leaveType,
+                                    leave.dateRange,
+                                    leave.applyDate,
+                                    leave.reason,
+                                    leave.fromDate,
+                                    leave.toDate,
+                                    );
+                              },
+                            ),
+                            const SizedBox(
+                              height: 10.0,
+                            ), // Add space between entries
+                          ],
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -235,7 +247,10 @@ class LeaveData extends StatelessWidget {
   final String dateRange;
   final String applyDate;
   final String status;
+  final String reason;
   final Function()? onEdit;
+  final DateTime fromDate;
+  final DateTime toDate;
 
   const LeaveData({
     Key? key,
@@ -243,7 +258,10 @@ class LeaveData extends StatelessWidget {
     required this.dateRange,
     required this.applyDate,
     required this.status,
+    required this.reason,
     this.onEdit,
+    required this.fromDate,
+    required this.toDate,
   }) : super(key: key);
 
   @override
