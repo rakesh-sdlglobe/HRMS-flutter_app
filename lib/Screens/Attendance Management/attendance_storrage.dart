@@ -97,9 +97,6 @@ class _AttendanceStorageState extends State<AttendanceStorage> {
   }
   @override
 Widget build(BuildContext context) {
-  presentDays = 0; // Reset presentDays
-  absentDays = 0; // Reset absentDays
-
   return Scaffold(
     appBar: AppBar(
       backgroundColor: kMainColor,
